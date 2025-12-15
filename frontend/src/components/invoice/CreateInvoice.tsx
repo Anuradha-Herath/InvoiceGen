@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, ArrowLeft, Download, Mail } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
+import { Invoice } from '@/types/invoice';
 import toast from 'react-hot-toast';
 
 interface InvoiceItem {
@@ -15,10 +16,12 @@ interface InvoiceItem {
 
 interface CreateInvoiceProps {
   onBack: () => void;
+  invoice?: Invoice;
+  isEditing?: boolean;
 }
 
-export function CreateInvoice({ onBack }: CreateInvoiceProps) {
-  const [invoiceNumber] = useState('INV-' + Math.floor(Math.random() * 10000));
+export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvoiceProps) {
+  const [invoiceNumber, setInvoiceNumber] = useState('INV-' + Math.floor(Math.random() * 10000));
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueDate, setDueDate] = useState('');
   const [currency, setCurrency] = useState('USD');
@@ -36,6 +39,32 @@ export function CreateInvoice({ onBack }: CreateInvoiceProps) {
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Pre-fill form if editing existing invoice
+  useEffect(() => {
+    if (invoice && isEditing) {
+      setInvoiceNumber(invoice.invoiceNumber);
+      setIssueDate(invoice.issueDate);
+      setDueDate(invoice.dueDate || '');
+      setCurrency(invoice.currency || 'USD');
+      setClientName(invoice.client?.name || '');
+      setClientEmail(invoice.client?.email || '');
+      setClientPhone(invoice.client?.phone || '');
+      setClientAddress(invoice.client?.address || '');
+      
+      const mappedItems = invoice.items.map((item) => ({
+        id: Math.random().toString(),
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      }));
+      setItems(mappedItems);
+      
+      setTaxRate(invoice.taxRate || 0);
+      setDiscount(invoice.discount || 0);
+      setNotes(invoice.notes || '');
+    }
+  }, [invoice, isEditing]);
 
   const addItem = () => {
     setItems([
@@ -130,8 +159,14 @@ export function CreateInvoice({ onBack }: CreateInvoiceProps) {
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1">
-          <h1 className="text-3xl font-bold text-gray-900">Create Invoice</h1>
-          <p className="text-gray-600 mt-1">Fill in the details to create a new invoice</p>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {isEditing ? 'Edit Invoice' : 'Create Invoice'}
+          </h1>
+          <p className="text-gray-600 mt-1">
+            {isEditing
+              ? 'Update the invoice details'
+              : 'Fill in the details to create a new invoice'}
+          </p>
         </div>
       </div>
 
@@ -351,7 +386,7 @@ export function CreateInvoice({ onBack }: CreateInvoiceProps) {
           onClick={handleSaveDraft}
           disabled={isSubmitting}
         >
-          Save as Draft
+          {isEditing ? 'Save Changes' : 'Save as Draft'}
         </Button>
         <Button
           onClick={handleGeneratePDF}

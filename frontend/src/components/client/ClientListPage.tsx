@@ -72,6 +72,8 @@ const mockClients: Client[] = [
 export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [viewingClient, setViewingClient] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -123,6 +125,11 @@ export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
     });
   };
 
+  const handleCloseViewModal = () => {
+    setIsViewModalOpen(false);
+    setViewingClient(null);
+  };
+
   const handleSaveClient = () => {
     if (!formData.name || !formData.email || !formData.company) {
       toast.error('Please fill in all required fields');
@@ -144,7 +151,8 @@ export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
   };
 
   const handleViewClient = (client: Client) => {
-    toast.info(`Viewing ${client.name}'s details`);
+    setViewingClient(client);
+    setIsViewModalOpen(true);
   };
 
   return (
@@ -289,6 +297,63 @@ export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
             onChange={(e) => setFormData({ ...formData, address: e.target.value })}
           />
         </div>
+      </Modal>
+
+      {/* View Client Detail Modal */}
+      <Modal
+        isOpen={isViewModalOpen}
+        onClose={handleCloseViewModal}
+        title={viewingClient ? `${viewingClient.name}` : 'Client Details'}
+        footer={
+          <div className="flex gap-3 justify-end">
+            <Button variant="ghost" onClick={handleCloseViewModal}>
+              Close
+            </Button>
+            <Button onClick={() => {
+              setFormData({
+                name: viewingClient?.name || '',
+                email: viewingClient?.email || '',
+                phone: viewingClient?.phone || '',
+                company: viewingClient?.company || '',
+                address: viewingClient?.address || '',
+              });
+              setEditingClient(viewingClient || null);
+              setIsViewModalOpen(false);
+              setIsModalOpen(true);
+            }}>
+              Edit Client
+            </Button>
+          </div>
+        }
+      >
+        {viewingClient && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <p className="mt-1 text-gray-900">{viewingClient.name}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Email</label>
+              <p className="mt-1 text-gray-900">{viewingClient.email}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Phone</label>
+              <p className="mt-1 text-gray-900">{viewingClient.phone || 'N/A'}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Company</label>
+              <p className="mt-1 text-gray-900">{viewingClient.company}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Address</label>
+              <p className="mt-1 text-gray-900">{viewingClient.address || 'N/A'}</p>
+            </div>
+            <div className="pt-4 border-t">
+              <label className="block text-sm font-medium text-gray-700">Total Invoices</label>
+              <p className="mt-1 text-blue-600 font-semibold">{viewingClient.invoices} invoices</p>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
