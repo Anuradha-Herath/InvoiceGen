@@ -1,0 +1,324 @@
+service: invoice-generator-api
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  memorySize: 512
+  timeout: 30
+  environment:
+    STAGE: ${self:provider.stage}
+    REGION: ${self:provider.region}
+    INVOICES_TABLE: ${self:custom.invoicesTable}
+    USERS_TABLE: ${self:custom.usersTable}
+    INVOICES_BUCKET: ${self:custom.invoicesBucket}
+    USER_POOL_ID: ${self:custom.userPoolId}
+    USER_POOL_CLIENT_ID: ${self:custom.userPoolClientId}
+  iam:
+    role:
+      statements:
+        # DynamoDB permissions
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.invoicesTable}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.usersTable}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.invoicesTable}/index/*
+        # S3 permissions
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:DeleteObject
+          Resource:
+            - arn:aws:s3:::${self:custom.invoicesBucket}/*
+        # SES permissions
+        - Effect: Allow
+          Action:
+            - ses:SendEmail
+            - ses:SendRawEmail
+          Resource: '*'
+
+custom:
+  invoicesTable: ${self:service}-invoices-${self:provider.stage}
+  usersTable: ${self:service}-users-${self:provider.stage}
+  invoicesBucket: ${self:service}-pdfs-${self:provider.stage}
+  userPoolId: ${env:USER_POOL_ID, 'YOUR_COGNITO_USER_POOL_ID'}
+  userPoolClientId: ${env:USER_POOL_CLIENT_ID, 'YOUR_COGNITO_CLIENT_ID'}
+  
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: true
+    exclude:
+      - aws-sdk
+    target: node18
+    platform: node
+    concurrency: 10
+  
+  serverless-offline:
+    httpPort: 3001
+    noPrependStageInUrl: true
+
+plugins:
+  - serverless-esbuild
+  - serverless-offline
+  - serverless-dotenv-plugin
+
+functions:
+  # Auth functions
+  signup:
+    handler: functions/auth/signup.handler
+    events:
+      - http:
+          path: /auth/signup
+          method: post
+          cors: true
+
+  login:
+    handler: functions/auth/login.handler
+    events:
+      - http:
+          path: /auth/login
+          method: post
+          cors: true
+
+  # Invoice CRUD operations
+  createInvoice:
+    handler: functions/invoices/create.handler
+    events:
+      - http:
+          path: /invoices
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  getInvoice:
+    handler: functions/invoices/get.handler
+    events:
+      - http:
+          path: /invoices/{id}
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  listInvoices:
+    handler: functions/invoices/list.handler
+    events:
+      - http:
+          path: /invoices
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  updateInvoice:
+    handler: functions/invoices/update.handler
+    events:
+      - http:
+          path: /invoices/{id}
+          method: put
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  deleteInvoice:
+    handler: functions/invoices/delete.handler
+    events:
+      - http:
+          path: /invoices/{id}
+          method: delete
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  # PDF generation
+  generatePDF:
+    handler: functions/pdf/generate.handler
+    memorySize: 1024
+    timeout: 60
+    layers:
+      - arn:aws:lambda:${self:provider.region}:764866452798:layer:chromium:3
+    events:
+      - http:
+          path: /invoices/{id}/pdf
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  # Email invoice
+  emailInvoice:
+    handler: functions/email/send.handler
+    events:
+      - http:
+          path: /invoices/{id}/email
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+resources:
+  Resources:
+    # Cognito User Pool
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:service}-user-pool-${self:provider.stage}
+        AutoVerifiedAttributes:
+          - email
+        UsernameAttributes:
+          - email
+        Schema:
+          - Name: email
+            Required: true
+            Mutable: false
+          - Name: name
+            Required: true
+            Mutable: true
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireLowercase: true
+            RequireNumbers: true
+            RequireSymbols: true
+            RequireUppercase: true
+
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:service}-user-pool-client-${self:provider.stage}
+        UserPoolId:
+          Ref: CognitoUserPool
+        ExplicitAuthFlows:
+          - ALLOW_USER_PASSWORD_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        GenerateSecret: false
+
+    # API Gateway Authorizer
+    ApiGatewayAuthorizer:
+      Type: AWS::ApiGateway::Authorizer
+      Properties:
+        Name: CognitoAuthorizer
+        Type: COGNITO_USER_POOLS
+        IdentitySource: method.request.header.Authorization
+        RestApiId:
+          Ref: ApiGatewayRestApi
+        ProviderARNs:
+          - Fn::GetAtt: [CognitoUserPool, Arn]
+
+    # DynamoDB Tables
+    InvoicesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.invoicesTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: UserIdIndex
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.usersTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: EmailIndex
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+    # S3 Bucket for PDFs
+    InvoicesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.invoicesBucket}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedOrigins:
+                - '*'
+              AllowedHeaders:
+                - '*'
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+                - DELETE
+              MaxAge: 3000
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+
+  Outputs:
+    ApiEndpoint:
+      Description: API Gateway endpoint URL
+      Value:
+        Fn::Sub: https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}
+    
+    UserPoolId:
+      Description: Cognito User Pool ID
+      Value:
+        Ref: CognitoUserPool
+    
+    UserPoolClientId:
+      Description: Cognito User Pool Client ID
+      Value:
+        Ref: CognitoUserPoolClient
+    
+    InvoicesBucket:
+      Description: S3 Bucket for invoice PDFs
+      Value:
+        Ref: InvoicesBucket

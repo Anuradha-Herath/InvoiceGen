@@ -1,0 +1,42 @@
+import { APIGatewayProxyHandler } from 'aws-lambda';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { errorResponse, successResponse } from '@/libs/response';
+import { getUserIdFromEvent } from '@/libs/auth';
+
+const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.REGION }));
+
+export const handler: APIGatewayProxyHandler = async (event) => {
+  try {
+    const userId = getUserIdFromEvent(event);
+    if (!userId) {
+      return errorResponse(401, 'Unauthorized');
+    }
+
+    const limit = parseInt(event.queryStringParameters?.limit || '50');
+    const lastKey = event.queryStringParameters?.lastKey;
+
+    const command = new QueryCommand({
+      TableName: process.env.INVOICES_TABLE,
+      IndexName: 'UserIdIndex',
+      KeyConditionExpression: 'userId = :userId',
+      ExpressionAttributeValues: {
+        ':userId': userId,
+      },
+      Limit: limit,
+      ScanIndexForward: false, // Sort by createdAt descending
+      ExclusiveStartKey: lastKey ? JSON.parse(lastKey) : undefined,
+    });
+
+    const result = await dynamoClient.send(command);
+
+    return successResponse({
+      items: result.Items || [],
+      lastKey: result.LastEvaluatedKey ? JSON.stringify(result.LastEvaluatedKey) : null,
+      count: result.Count,
+    });
+  } catch (error: any) {
+    console.error('List invoices error:', error);
+    return errorResponse(500, error.message || 'Failed to list invoices');
+  }
+};

@@ -1,0 +1,29 @@
+{
+  "name": "invoice-generator-saas",
+  "version": "1.0.0",
+  "description": "Serverless Invoice Generator SaaS with AWS Lambda, DynamoDB, S3, SES, and Next.js",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "deploy:backend": "npm run deploy --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "test": "npm run test --workspaces",
+    "clean": "npm run clean --workspaces && rm -rf node_modules"
+  },
+  "keywords": [
+    "invoice",
+    "serverless",
+    "aws",
+    "lambda",
+    "nextjs",
+    "saas"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
