@@ -13,18 +13,33 @@ export default function DashboardPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
+    // Check authentication first
+    const authenticated = authService.isAuthenticated();
+    if (!authenticated) {
+      router.push('/auth/login');
+      return;
+    }
+    setIsAuthenticated(true);
     fetchInvoices();
-  }, []);
+  }, [router]);
 
   const fetchInvoices = async () => {
     try {
       const response = await invoiceService.list();
       setInvoices(response.items);
+      setIsLoading(false);
     } catch (error: any) {
-      toast.error('Failed to load invoices');
-    } finally {
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        toast.error('Failed to connect to server. Make sure the backend is running on port 3001');
+      } else if (error.response?.status === 401) {
+        toast.error('Session expired. Please login again.');
+        router.push('/auth/login');
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to load invoices');
+      }
       setIsLoading(false);
     }
   };

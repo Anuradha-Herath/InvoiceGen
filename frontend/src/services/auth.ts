@@ -15,6 +15,7 @@ export const authService = {
   logout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('authTokens');
+      // Use router push instead of window.location for better Next.js handling
       window.location.href = '/auth/login';
     }
   },
@@ -34,6 +35,12 @@ export const authService = {
   },
 
   isAuthenticated(): boolean {
-    return !!this.getTokens();
+    if (typeof window === 'undefined') return false;
+    try {
+      const tokens = this.getTokens();
+      return !!tokens?.idToken;
+    } catch {
+      return false;
+    }
   },
 };
