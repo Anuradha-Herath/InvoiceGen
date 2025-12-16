@@ -13,6 +13,7 @@ const invoiceClientSchema = Joi.object({
   email: Joi.string().email().required(),
   address: Joi.string().optional().max(500),
   phone: Joi.string().optional().max(50),
+  company: Joi.string().optional().max(200),
 });
 
 export const invoiceSchema = Joi.object({
@@ -22,6 +23,7 @@ export const invoiceSchema = Joi.object({
   subtotal: Joi.number().required().min(0),
   tax: Joi.number().optional().min(0),
   taxRate: Joi.number().optional().min(0).max(100),
+  discount: Joi.number().optional().min(0).max(100),
   total: Joi.number().required().min(0),
   currency: Joi.string().required().length(3).uppercase(),
   issueDate: Joi.string().isoDate().required(),
