@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, Eye } from 'lucide-react';
 import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui/Table';
 import { Modal } from '../ui/Modal';
+import { apiClient } from '@/services/api';
 import toast from 'react-hot-toast';
 
 interface Client {
@@ -14,14 +15,14 @@ interface Client {
   phone?: string;
   company: string;
   address?: string;
-  invoices: number;
+  invoices?: number;
 }
 
 interface ClientListPageProps {
-  clients: Client[];
+  onClientAdded?: (client: Client) => void;
 }
 
-const mockClients: Client[] = [
+const mockClients: Client[] = [];
   {
     id: '1',
     name: 'Acme Corporation',
@@ -58,23 +59,16 @@ const mockClients: Client[] = [
     address: '321 Design St, Los Angeles, CA 90001',
     invoices: 6,
   },
-  {
-    id: '5',
-    name: 'Emily Davis',
-    email: 'emily@digital.com',
-    phone: '+1 (555) 567-8901',
-    company: 'Digital Media Co',
-    address: '654 Media Park, Miami, FL 33101',
-    invoices: 10,
-  },
 ];
 
-export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
+export function ClientListPage({ onClientAdded }: ClientListPageProps) {
+  const [clients, setClients] = useState<Client[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -82,6 +76,26 @@ export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
     company: '',
     address: '',
   });
+
+  // Load clients on mount
+  useEffect(() => {
+    loadClients();
+  }, []);
+
+  const loadClients = async () => {
+    setIsLoading(true);
+    try {
+      const response = await apiClient.get('/clients');
+      const clientList = response.data.data || [];
+      setClients(clientList);
+    } catch (error) {
+      console.error('Failed to load clients:', error);
+      toast.error('Failed to load clients');
+      setClients([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredClients = clients.filter(
     (client) =>
@@ -136,17 +150,49 @@ export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
       return;
     }
 
-    if (editingClient) {
-      toast.success(`${formData.name} updated successfully`);
-    } else {
-      toast.success(`${formData.name} added successfully`);
-    }
-    handleCloseModal();
+    setIsLoading(true);
+    const saveOperation = editingClient
+      ? apiClient.put(`/clients/${editingClient.id}`, formData)
+      : apiClient.post('/clients', formData);
+
+    saveOperation
+      .then((response) => {
+        if (editingClient) {
+          toast.success(`${formData.name} updated successfully`);
+        } else {
+          toast.success(`${formData.name} added successfully`);
+          if (onClientAdded) {
+            onClientAdded(response.data.data);
+          }
+        }
+        loadClients();
+        handleCloseModal();
+      })
+      .catch((error) => {
+        const message = error.response?.data?.message || 'Failed to save client';
+        toast.error(message);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleDeleteClient = (client: Client) => {
     if (confirm(`Are you sure you want to delete ${client.name}?`)) {
-      toast.success(`${client.name} deleted successfully`);
+      setIsLoading(true);
+      apiClient
+        .delete(`/clients/${client.id}`)
+        .then(() => {
+          toast.success(`${client.name} deleted successfully`);
+          loadClients();
+        })
+        .catch((error) => {
+          const message = error.response?.data?.message || 'Failed to delete client';
+          toast.error(message);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     }
   };
 
@@ -184,7 +230,11 @@ export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
       {/* Clients Table */}
       <Card>
         <CardContent className="pt-6">
-          {filteredClients.length === 0 ? (
+          {isLoading ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500">Loading clients...</p>
+            </div>
+          ) : filteredClients.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500 mb-4">No clients found</p>
               {clients.length === 0 ? (
@@ -212,7 +262,7 @@ export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
                       <TableCell className="text-gray-600">{client.email}</TableCell>
                       <TableCell>{client.company}</TableCell>
                       <TableCell>
-                        <span className="text-blue-600 font-medium">{client.invoices}</span>
+                        <span className="text-blue-600 font-medium">{client.invoices || 0}</span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
@@ -220,6 +270,7 @@ export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
                             onClick={() => handleViewClient(client)}
                             className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded transition-all"
                             title="View"
+                            disabled={isLoading}
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -227,6 +278,7 @@ export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
                             onClick={() => handleOpenModal(client)}
                             className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded transition-all"
                             title="Edit"
+                            disabled={isLoading}
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
@@ -234,6 +286,7 @@ export function ClientListPage({ clients = mockClients }: ClientListPageProps) {
                             onClick={() => handleDeleteClient(client)}
                             className="p-1.5 text-gray-600 hover:text-red-600 hover:bg-gray-100 rounded transition-all"
                             title="Delete"
+                            disabled={isLoading}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

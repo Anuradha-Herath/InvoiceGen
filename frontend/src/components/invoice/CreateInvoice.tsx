@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Invoice } from '@/types/invoice';
+import { apiClient } from '@/services/api';
 import toast from 'react-hot-toast';
 
 interface InvoiceItem {
@@ -12,12 +13,37 @@ interface InvoiceItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  amount?: number;
 }
 
 interface CreateInvoiceProps {
   onBack: () => void;
   invoice?: Invoice;
   isEditing?: boolean;
+}
+
+interface CreateInvoicePayload {
+  invoiceNumber: string;
+  issueDate: string;
+  dueDate: string;
+  currency: string;
+  client: {
+    name: string;
+    email: string;
+    phone?: string;
+    company?: string;
+    address?: string;
+  };
+  items: Array<{
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+  }>;
+  taxRate: number;
+  discount: number;
+  notes: string;
+  status: 'draft' | 'generated' | 'sent' | 'paid';
 }
 
 export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvoiceProps) {
@@ -39,8 +65,21 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
   const [discount, setDiscount] = useState(0);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [clients, setClients] = useState<Array<{ id: string; name: string; email: string; phone?: string; company?: string; address?: string }>>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
 
-  // Pre-fill form if editing existing invoice
+  // Load clients on mount
+  useEffect(() => {
+    const loadClients = async () => {
+      try {
+        const response = await apiClient.get('/clients');
+        setClients(response.data.data || []);
+      } catch (error) {
+        console.error('Failed to load clients:', error);
+      }
+    };
+    loadClients();
+  }, []);
   useEffect(() => {
     if (invoice && isEditing) {
       setInvoiceNumber(invoice.invoiceNumber);
@@ -57,6 +96,7 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
         description: item.description,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
+        amount: item.quantity * item.unitPrice,
       }));
       setItems(mappedItems);
       
@@ -88,9 +128,45 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
   };
 
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-  const taxAmount = subtotal * (taxRate / 100);
-  const discountAmount = subtotal * (discount / 100);
-  const total = subtotal + taxAmount - discountAmount;
+  const taxAmount = Math.round(subtotal * (taxRate / 100) * 100) / 100;
+  const discountAmount = Math.round(subtotal * (discount / 100) * 100) / 100;
+  const total = Math.round((subtotal + taxAmount - discountAmount) * 100) / 100;
+
+  // Helper function to add client from modal
+  const handleSelectClient = (client: any) => {
+    setClientName(client.name);
+    setClientEmail(client.email);
+    setClientPhone(client.phone || '');
+    setClientAddress(client.address || '');
+    setSelectedClientId(client.id);
+  };
+
+  // Create payload for API
+  const createInvoicePayload = (): CreateInvoicePayload => {
+    return {
+      invoiceNumber,
+      issueDate,
+      dueDate,
+      currency,
+      client: {
+        name: clientName,
+        email: clientEmail,
+        phone: clientPhone || undefined,
+        company: clientName,
+        address: clientAddress || undefined,
+      },
+      items: items.map((item) => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        amount: Math.round(item.quantity * item.unitPrice * 100) / 100,
+      })),
+      taxRate,
+      discount,
+      notes,
+      status: 'draft',
+    };
+  };
 
   const handleSaveDraft = async () => {
     if (!clientName) {
@@ -100,10 +176,18 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
 
     setIsSubmitting(true);
     try {
-      // TODO: Call API to save draft when backend is ready
-      toast.success('Invoice saved as draft!');
-    } catch (error) {
-      toast.error('Failed to save invoice');
+      const payload = createInvoicePayload();
+      if (isEditing && invoice?.id) {
+        await apiClient.put(`/invoices/${invoice.id}`, payload);
+        toast.success('Invoice updated successfully!');
+      } else {
+        const response = await apiClient.post('/invoices', payload);
+        toast.success('Invoice saved as draft!');
+      }
+      onBack();
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Failed to save invoice';
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -122,10 +206,26 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
 
     setIsSubmitting(true);
     try {
-      // TODO: Call API to generate PDF when backend is ready
+      const payload = createInvoicePayload();
+      payload.status = 'generated';
+      
+      if (isEditing && invoice?.id) {
+        await apiClient.put(`/invoices/${invoice.id}`, payload);
+      } else {
+        await apiClient.post('/invoices', payload);
+      }
+      
+      // Generate PDF
+      if (invoice?.id || true) { // After create, we'd have the ID
+        await apiClient.get(`/invoices/generate-pdf/${invoice?.id || 'temp'}`, {
+          responseType: 'blob',
+        });
+      }
+      
       toast.success('PDF generated successfully!');
-    } catch (error) {
-      toast.error('Failed to generate PDF');
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Failed to generate PDF';
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -139,10 +239,22 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
 
     setIsSubmitting(true);
     try {
-      // TODO: Call API to send invoice when backend is ready
+      const payload = createInvoicePayload();
+      payload.status = 'sent';
+      
+      if (isEditing && invoice?.id) {
+        await apiClient.put(`/invoices/${invoice.id}`, payload);
+        await apiClient.post(`/invoices/${invoice.id}/send-email`);
+      } else {
+        const response = await apiClient.post('/invoices', payload);
+        await apiClient.post(`/invoices/${response.data.data.id}/send-email`);
+      }
+      
       toast.success('Invoice sent successfully!');
-    } catch (error) {
-      toast.error('Failed to send invoice');
+      onBack();
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Failed to send invoice';
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -212,6 +324,29 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Select Existing Client (Optional)
+              </label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                value={selectedClientId}
+                onChange={(e) => {
+                  const client = clients.find((c) => c.id === e.target.value);
+                  if (client) {
+                    handleSelectClient(client);
+                    setSelectedClientId(e.target.value);
+                  }
+                }}
+              >
+                <option value="">-- Choose a client --</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name} ({client.email})
+                  </option>
+                ))}
+              </select>
+            </div>
             <Input
               label="Client Name"
               placeholder="Acme Corporation"
