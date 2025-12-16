@@ -3,6 +3,7 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { errorResponse, successResponse } from '@/libs/response';
 import { getUserIdFromEvent } from '@/libs/auth';
+import { validatePaginationParams, encodePaginationKey } from '@/libs/pagination';
 
 const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.REGION }));
 
@@ -13,8 +14,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return errorResponse(401, 'Unauthorized');
     }
 
-    const limit = parseInt(event.queryStringParameters?.limit || '50');
-    const lastKey = event.queryStringParameters?.lastKey;
+    const { limit, lastKey } = validatePaginationParams(
+      event.queryStringParameters?.limit,
+      event.queryStringParameters?.lastKey
+    );
 
     const command = new QueryCommand({
       TableName: process.env.INVOICES_TABLE,
@@ -25,16 +28,22 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       },
       Limit: limit,
       ScanIndexForward: false, // Sort by createdAt descending
-      ExclusiveStartKey: lastKey ? JSON.parse(lastKey) : undefined,
+      ExclusiveStartKey: lastKey,
     });
 
     const result = await dynamoClient.send(command);
 
-    return successResponse({
+    const response: any = {
       items: result.Items || [],
-      lastKey: result.LastEvaluatedKey ? JSON.stringify(result.LastEvaluatedKey) : null,
-      count: result.Count,
-    });
+      count: result.Count || 0,
+    };
+
+    // Include encoded lastKey if more items exist
+    if (result.LastEvaluatedKey) {
+      response.lastKey = encodePaginationKey(result.LastEvaluatedKey);
+    }
+
+    return successResponse(response);
   } catch (error: any) {
     console.error('List invoices error:', error);
     return errorResponse(500, error.message || 'Failed to list invoices');
