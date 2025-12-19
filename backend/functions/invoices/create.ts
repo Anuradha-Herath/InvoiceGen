@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { errorResponse, successResponse } from '@/libs/response';
 import { getUserIdFromEvent } from '@/libs/auth';
 import { CreateInvoiceRequest } from '@/models/invoice';
-import { validateInvoice } from '@/libs/validation';
+import { validateAndNormalizeInvoice } from '@/libs/validation';
 
 const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.REGION }));
 
@@ -18,10 +18,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     const body: CreateInvoiceRequest = JSON.parse(event.body || '{}');
     
-    // Validate invoice data
-    const { error, value } = validateInvoice(body);
-    if (error) {
-      return errorResponse(400, error.details[0].message);
+    // Validate invoice data and calculations
+    const validation = validateAndNormalizeInvoice(body);
+    if (!validation.isValid) {
+      return errorResponse(400, validation.errors?.join('; ') || 'Validation failed');
     }
 
     const invoiceId = uuidv4();
@@ -30,7 +30,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const invoice = {
       id: invoiceId,
       userId,
-      ...value,
+      ...validation.data,
       status: 'draft',
       pdfUrl: null,
       createdAt: now,

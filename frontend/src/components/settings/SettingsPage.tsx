@@ -1,49 +1,123 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Building2, Mail, CreditCard, Upload } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Tabs } from '../ui/Tabs';
+import { apiClient } from '@/services/api';
 import toast from 'react-hot-toast';
 
 export function SettingsPage() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string>('');
+  
   const [profile, setProfile] = useState({
-    name: 'John Doe',
-    email: 'john@example.com',
+    name: '',
+    email: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
 
   const [company, setCompany] = useState({
-    name: 'InvoiceGen Inc',
-    address: '456 Business Rd, San Francisco, CA 94102',
-    phone: '+1 (555) 123-4567',
-    email: 'contact@invoicegen.com',
-    website: 'www.invoicegen.com',
-    taxId: '12-3456789',
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    website: '',
+    taxId: '',
+    logoUrl: '',
   });
 
   const [emailSettings, setEmailSettings] = useState({
-    subject: 'Invoice from {{company_name}}',
-    message: `Hi {{client_name}},
-
-Please find attached invoice {{invoice_number}} for {{invoice_amount}}.
-
-Payment is due by {{due_date}}.
-
-Thank you for your business!
-
-Best regards,
-{{company_name}}`,
+    subject: '',
+    message: '',
   });
+
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    setIsLoading(true);
+    try {
+      // Load profile
+      const profileResponse = await apiClient.get('/settings/profile');
+      if (profileResponse.data.data) {
+        setProfile((prev) => ({
+          ...prev,
+          name: profileResponse.data.data.name || '',
+          email: profileResponse.data.data.email || '',
+        }));
+      }
+
+      // Load company settings
+      const companyResponse = await apiClient.get('/settings/company');
+      if (companyResponse.data.data) {
+        const companyData = companyResponse.data.data;
+        setCompany({
+          name: companyData.name || '',
+          address: companyData.address || '',
+          phone: companyData.phone || '',
+          email: companyData.email || '',
+          website: companyData.website || '',
+          taxId: companyData.taxId || '',
+          logoUrl: companyData.logoUrl || '',
+        });
+        if (companyData.logoUrl) {
+          setLogoPreview(companyData.logoUrl);
+        }
+      }
+
+      // Load email template
+      const emailResponse = await apiClient.get('/settings/email-template');
+      if (emailResponse.data.data) {
+        setEmailSettings({
+          subject: emailResponse.data.data.subject || '',
+          message: emailResponse.data.data.message || '',
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load settings:', error);
+      // Set default values on error
+      setProfile((prev) => ({
+        ...prev,
+        name: 'User',
+        email: '',
+      }));
+      setEmailSettings({
+        subject: 'Invoice from {{company_name}}',
+        message: `Hi {{client_name}},\n\nPlease find attached invoice {{invoice_number}} for {{invoice_amount}}.\n\nPayment is due by {{due_date}}.\n\nThank you for your business!\n\nBest regards,\n{{company_name}}`,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSaveProfile = () => {
     if (!profile.name || !profile.email) {
       toast.error('Please fill in all fields');
       return;
     }
-    toast.success('Profile updated successfully');
+
+    setIsLoading(true);
+    apiClient
+      .put('/settings/profile', {
+        name: profile.name,
+        email: profile.email,
+      })
+      .then(() => {
+        toast.success('Profile updated successfully');
+      })
+      .catch((error) => {
+        const message = error.response?.data?.message || 'Failed to update profile';
+        toast.error(message);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleUpdatePassword = () => {
@@ -59,13 +133,29 @@ Best regards,
       toast.error('Password must be at least 8 characters');
       return;
     }
-    toast.success('Password updated successfully');
-    setProfile({
-      ...profile,
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-    });
+
+    setIsLoading(true);
+    apiClient
+      .post('/settings/change-password', {
+        currentPassword: profile.currentPassword,
+        newPassword: profile.newPassword,
+      })
+      .then(() => {
+        toast.success('Password updated successfully');
+        setProfile({
+          ...profile,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+      })
+      .catch((error) => {
+        const message = error.response?.data?.message || 'Failed to update password';
+        toast.error(message);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleSaveCompany = () => {
@@ -73,11 +163,77 @@ Best regards,
       toast.error('Please fill in required fields');
       return;
     }
-    toast.success('Company information updated successfully');
+
+    setIsLoading(true);
+    apiClient
+      .put('/settings/company', {
+        name: company.name,
+        address: company.address,
+        phone: company.phone,
+        email: company.email,
+        website: company.website,
+        taxId: company.taxId,
+      })
+      .then(() => {
+        toast.success('Company information updated successfully');
+      })
+      .catch((error) => {
+        const message = error.response?.data?.message || 'Failed to update company info';
+        toast.error(message);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
-  const handleUploadLogo = () => {
-    toast.success('Logo upload feature coming soon');
+  const handleUploadLogo = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/svg+xml'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please upload a PNG, JPG, GIF, or SVG image');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setLogoFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setLogoPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    setIsLoading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    apiClient
+      .post('/settings/upload-logo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      .then((response) => {
+        toast.success('Logo uploaded successfully');
+        setCompany((prev) => ({
+          ...prev,
+          logoUrl: response.data.data.logoUrl,
+        }));
+      })
+      .catch((error) => {
+        const message = error.response?.data?.message || 'Failed to upload logo';
+        toast.error(message);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleSaveEmailTemplate = () => {
@@ -85,7 +241,23 @@ Best regards,
       toast.error('Please fill in all fields');
       return;
     }
-    toast.success('Email template saved successfully');
+
+    setIsLoading(true);
+    apiClient
+      .put('/settings/email-template', {
+        subject: emailSettings.subject,
+        message: emailSettings.message,
+      })
+      .then(() => {
+        toast.success('Email template saved successfully');
+      })
+      .catch((error) => {
+        const message = error.response?.data?.message || 'Failed to save email template';
+        toast.error(message);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleChangePlan = () => {
@@ -228,16 +400,39 @@ Best regards,
             <CardContent>
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-24 h-24 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                    <Upload className="w-8 h-8 text-gray-400" />
+                  <div className="w-24 h-24 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
+                    {logoPreview ? (
+                      <img src={logoPreview} alt="Logo preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <Upload className="w-8 h-8 text-gray-400" />
+                    )}
                   </div>
                   <div>
-                    <Button variant="secondary" size="sm" onClick={handleUploadLogo}>
-                      <Upload className="w-4 h-4" />
-                      Upload Logo
-                    </Button>
+                    <label>
+                      <Button 
+                        variant="secondary" 
+                        size="sm"
+                        disabled={isLoading}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          document.getElementById('logo-upload')?.click();
+                        }}
+                      >
+                        <Upload className="w-4 h-4" />
+                        Upload Logo
+                      </Button>
+                      <input
+                        id="logo-upload"
+                        type="file"
+                        accept="image/png,image/jpeg,image/gif,image/svg+xml"
+                        onChange={handleUploadLogo}
+                        className="hidden"
+                        disabled={isLoading}
+                      />
+                    </label>
                     <p className="text-xs text-gray-500 mt-2">
-                      Recommended: 200x200px, PNG or JPG
+                      PNG, JPG, GIF, or SVG. Max 5MB
                     </p>
                   </div>
                 </div>

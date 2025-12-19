@@ -14,9 +14,13 @@ provider:
     REGION: ${self:provider.region}
     INVOICES_TABLE: ${self:custom.invoicesTable}
     USERS_TABLE: ${self:custom.usersTable}
+    CLIENTS_TABLE: ${self:custom.clientsTable}
+    COMPANY_SETTINGS_TABLE: ${self:custom.companySettingsTable}
+    EMAIL_TEMPLATES_TABLE: ${self:custom.emailTemplatesTable}
     INVOICES_BUCKET: ${self:custom.invoicesBucket}
     USER_POOL_ID: ${self:custom.userPoolId}
     USER_POOL_CLIENT_ID: ${self:custom.userPoolClientId}
+    SES_FROM_EMAIL: ${env:SES_FROM_EMAIL, 'noreply@invoicegenerator.com'}
   iam:
     role:
       statements:
@@ -32,6 +36,9 @@ provider:
           Resource:
             - arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.invoicesTable}
             - arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.usersTable}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.clientsTable}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.companySettingsTable}
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.emailTemplatesTable}
             - arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.invoicesTable}/index/*
         # S3 permissions
         - Effect: Allow
@@ -47,10 +54,20 @@ provider:
             - ses:SendEmail
             - ses:SendRawEmail
           Resource: '*'
+        # Cognito permissions for password changes
+        - Effect: Allow
+          Action:
+            - cognito-idp:AdminUpdateUserAttributes
+            - cognito-idp:AdminSetUserPassword
+          Resource:
+            - arn:aws:cognito-idp:${self:provider.region}:*:userpool/*
 
 custom:
   invoicesTable: ${self:service}-invoices-${self:provider.stage}
   usersTable: ${self:service}-users-${self:provider.stage}
+  clientsTable: ${self:service}-clients-${self:provider.stage}
+  companySettingsTable: ${self:service}-company-settings-${self:provider.stage}
+  emailTemplatesTable: ${self:service}-email-templates-${self:provider.stage}
   invoicesBucket: ${self:service}-pdfs-${self:provider.stage}
   userPoolId: ${env:USER_POOL_ID, 'YOUR_COGNITO_USER_POOL_ID'}
   userPoolClientId: ${env:USER_POOL_CLIENT_ID, 'YOUR_COGNITO_CLIENT_ID'}
@@ -109,7 +126,7 @@ functions:
     handler: functions/invoices/get.handler
     events:
       - http:
-          path: /invoices/{id}
+          path: /invoices/{invoiceId}
           method: get
           cors: true
           authorizer:
@@ -133,7 +150,7 @@ functions:
     handler: functions/invoices/update.handler
     events:
       - http:
-          path: /invoices/{id}
+          path: /invoices/{invoiceId}
           method: put
           cors: true
           authorizer:
@@ -145,7 +162,80 @@ functions:
     handler: functions/invoices/delete.handler
     events:
       - http:
-          path: /invoices/{id}
+          path: /invoices/{invoiceId}
+          method: delete
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  updateInvoiceStatus:
+    handler: functions/invoices/update-status.handler
+    events:
+      - http:
+          path: /invoices/{invoiceId}/status
+          method: patch
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  # Client management
+  createClient:
+    handler: functions/clients/create.handler
+    events:
+      - http:
+          path: /clients
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  getClient:
+    handler: functions/clients/get.handler
+    events:
+      - http:
+          path: /clients/{clientId}
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  listClients:
+    handler: functions/clients/list.handler
+    events:
+      - http:
+          path: /clients
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  updateClient:
+    handler: functions/clients/update.handler
+    events:
+      - http:
+          path: /clients/{clientId}
+          method: put
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  deleteClient:
+    handler: functions/clients/delete.handler
+    events:
+      - http:
+          path: /clients/{clientId}
           method: delete
           cors: true
           authorizer:
@@ -158,11 +248,9 @@ functions:
     handler: functions/pdf/generate.handler
     memorySize: 1024
     timeout: 60
-    layers:
-      - arn:aws:lambda:${self:provider.region}:764866452798:layer:chromium:3
     events:
       - http:
-          path: /invoices/{id}/pdf
+          path: /invoices/{invoiceId}/pdf
           method: post
           cors: true
           authorizer:
@@ -175,7 +263,104 @@ functions:
     handler: functions/email/send.handler
     events:
       - http:
-          path: /invoices/{id}/email
+          path: /invoices/{invoiceId}/email
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  # User Settings
+  getProfile:
+    handler: functions/settings/profile.handler
+    events:
+      - http:
+          path: /settings/profile
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  updateProfile:
+    handler: functions/settings/profile.handler
+    events:
+      - http:
+          path: /settings/profile
+          method: put
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  getCompanySettings:
+    handler: functions/settings/company.handler
+    events:
+      - http:
+          path: /settings/company
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  updateCompanySettings:
+    handler: functions/settings/company.handler
+    events:
+      - http:
+          path: /settings/company
+          method: put
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  getEmailTemplate:
+    handler: functions/settings/email-template.handler
+    events:
+      - http:
+          path: /settings/email-template
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  updateEmailTemplate:
+    handler: functions/settings/email-template.handler
+    events:
+      - http:
+          path: /settings/email-template
+          method: put
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  changePassword:
+    handler: functions/settings/change-password.handler
+    events:
+      - http:
+          path: /settings/change-password
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId:
+              Ref: ApiGatewayAuthorizer
+
+  uploadLogo:
+    handler: functions/settings/upload-logo.handler
+    events:
+      - http:
+          path: /settings/upload-logo
           method: post
           cors: true
           authorizer:
@@ -278,6 +463,57 @@ resources:
                 KeyType: HASH
             Projection:
               ProjectionType: ALL
+
+    ClientsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.clientsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+          - AttributeName: id
+            AttributeType: S
+          - AttributeName: createdAt
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+          - AttributeName: id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: UserCreatedIndex
+            KeySchema:
+              - AttributeName: userId
+                KeyType: HASH
+              - AttributeName: createdAt
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    CompanySettingsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.companySettingsTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+
+    EmailTemplatesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.emailTemplatesTable}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: userId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
 
     # S3 Bucket for PDFs
     InvoicesBucket:

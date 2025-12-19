@@ -2,7 +2,7 @@ export interface InvoiceItem {
   description: string;
   quantity: number;
   unitPrice: number;
-  amount: number;
+  amount: number; // lineAmount = quantity * unitPrice
 }
 
 export interface InvoiceClient {
@@ -10,6 +10,7 @@ export interface InvoiceClient {
   email: string;
   address?: string;
   phone?: string;
+  company?: string;
 }
 
 export interface Invoice {
@@ -21,6 +22,7 @@ export interface Invoice {
   subtotal: number;
   tax?: number;
   taxRate?: number;
+  discount?: number;
   total: number;
   currency: string;
   issueDate: string;
@@ -39,6 +41,7 @@ export interface CreateInvoiceRequest {
   subtotal: number;
   tax?: number;
   taxRate?: number;
+  discount?: number;
   total: number;
   currency: string;
   issueDate: string;
@@ -53,6 +56,7 @@ export interface UpdateInvoiceRequest {
   subtotal?: number;
   tax?: number;
   taxRate?: number;
+  discount?: number;
   total?: number;
   currency?: string;
   issueDate?: string;

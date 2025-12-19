@@ -20,15 +20,14 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     );
 
     const command = new QueryCommand({
-      TableName: process.env.INVOICES_TABLE,
-      IndexName: 'UserIdIndex',
+      TableName: process.env.CLIENTS_TABLE,
       KeyConditionExpression: 'userId = :userId',
       ExpressionAttributeValues: {
         ':userId': userId,
       },
       Limit: limit,
-      ScanIndexForward: false, // Sort by createdAt descending
       ExclusiveStartKey: lastKey,
+      ScanIndexForward: false, // Most recent first
     });
 
     const result = await dynamoClient.send(command);
@@ -45,7 +44,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     return successResponse(response);
   } catch (error: any) {
-    console.error('List invoices error:', error);
-    return errorResponse(500, error.message || 'Failed to list invoices');
+    console.error('List clients error:', error);
+    return errorResponse(500, error.message || 'Failed to list clients');
   }
 };
