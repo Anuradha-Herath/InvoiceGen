@@ -24,7 +24,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return errorResponse(401, 'Unauthorized');
     }
 
-    if (event.requestContext.http.method === 'GET') {
+    if (event.requestContext.httpMethod === 'GET') {
       const command = new GetCommand({
         TableName: process.env.COMPANY_SETTINGS_TABLE,
         Key: { userId },
@@ -49,7 +49,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return successResponse(result.Item);
     }
 
-    if (event.requestContext.http.method === 'PUT') {
+    if (event.requestContext.httpMethod === 'PUT') {
       const body: UpdateCompanySettingsRequest = JSON.parse(event.body || '{}');
       
       const { error, value } = companySettingsSchema.validate(body, { abortEarly: false });

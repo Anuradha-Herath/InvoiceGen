@@ -61,7 +61,7 @@ export const validateAndNormalizeInvoice = (data: CreateInvoiceRequest): {
 
   // Validate lineAmount for each item
   let calculatedSubtotal = 0;
-  value.items.forEach((item, index) => {
+  value.items.forEach((item: any, index: number) => {
     const calculatedAmount = Math.round(item.quantity * item.unitPrice * 100) / 100;
     const providedAmount = Math.round(item.amount * 100) / 100;
 

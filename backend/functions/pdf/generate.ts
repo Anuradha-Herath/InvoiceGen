@@ -7,6 +7,7 @@ import puppeteer from 'puppeteer-core';
 import { errorResponse, successResponse } from '@/libs/response';
 import { getUserIdFromEvent } from '@/libs/auth';
 import { generateInvoiceHTML } from '@/libs/pdfTemplate';
+import { Invoice } from '@/models/invoice';
 
 const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.REGION }));
 const s3Client = new S3Client({ region: process.env.REGION });
@@ -45,11 +46,11 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       args: chromium.args,
       defaultViewport: chromium.defaultViewport,
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      headless: true,
     });
 
     const page = await browser.newPage();
-    const html = generateInvoiceHTML(result.Item);
+    const html = generateInvoiceHTML(result.Item as unknown as Invoice);
     
     await page.setContent(html, { waitUntil: 'networkidle0' });
     const pdfBuffer = await page.pdf({

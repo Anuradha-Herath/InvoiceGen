@@ -31,7 +31,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return errorResponse(401, 'Unauthorized');
     }
 
-    if (event.requestContext.http.method === 'GET') {
+    if (event.requestContext.httpMethod === 'GET') {
       const command = new GetCommand({
         TableName: process.env.EMAIL_TEMPLATES_TABLE,
         Key: { userId },
@@ -52,7 +52,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return successResponse(result.Item);
     }
 
-    if (event.requestContext.http.method === 'PUT') {
+    if (event.requestContext.httpMethod === 'PUT') {
       const body: UpdateEmailTemplateRequest = JSON.parse(event.body || '{}');
       
       const { error, value } = emailTemplateSchema.validate(body, { abortEarly: false });
