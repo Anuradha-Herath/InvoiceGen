@@ -126,7 +126,7 @@ functions:
     handler: functions/invoices/get.handler
     events:
       - http:
-          path: /invoices/{id}
+          path: /invoices/{invoiceId}
           method: get
           cors: true
           authorizer:
@@ -150,7 +150,7 @@ functions:
     handler: functions/invoices/update.handler
     events:
       - http:
-          path: /invoices/{id}
+          path: /invoices/{invoiceId}
           method: put
           cors: true
           authorizer:
@@ -162,7 +162,7 @@ functions:
     handler: functions/invoices/delete.handler
     events:
       - http:
-          path: /invoices/{id}
+          path: /invoices/{invoiceId}
           method: delete
           cors: true
           authorizer:
@@ -248,11 +248,9 @@ functions:
     handler: functions/pdf/generate.handler
     memorySize: 1024
     timeout: 60
-    layers:
-      - arn:aws:lambda:${self:provider.region}:764866452798:layer:chromium:3
     events:
       - http:
-          path: /invoices/{id}/pdf
+          path: /invoices/{invoiceId}/pdf
           method: post
           cors: true
           authorizer:
@@ -265,7 +263,7 @@ functions:
     handler: functions/email/send.handler
     events:
       - http:
-          path: /invoices/{id}/email
+          path: /invoices/{invoiceId}/email
           method: post
           cors: true
           authorizer:
