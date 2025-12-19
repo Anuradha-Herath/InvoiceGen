@@ -13,6 +13,8 @@ import toast from 'react-hot-toast';
 
 interface InvoiceListPageProps {
   onNavigate?: (page: string) => void;
+  invoices?: Invoice[];
+  isLoading?: boolean;
 }
 
 interface PaginatedResponse {
@@ -21,10 +23,10 @@ interface PaginatedResponse {
   total?: number;
 }
 
-export function InvoiceListPage({ onNavigate }: InvoiceListPageProps) {
+export function InvoiceListPage({ onNavigate, invoices: initialInvoices, isLoading: initialIsLoading }: InvoiceListPageProps) {
   const router = useRouter();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [invoices, setInvoices] = useState<Invoice[]>(initialInvoices || []);
+  const [isLoading, setIsLoading] = useState(initialIsLoading !== undefined ? initialIsLoading : true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [startDate, setStartDate] = useState('');

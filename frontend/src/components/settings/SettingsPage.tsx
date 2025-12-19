@@ -261,11 +261,11 @@ export function SettingsPage() {
   };
 
   const handleChangePlan = () => {
-    toast.info('Plan change feature coming soon');
+    toast.success('Plan change feature coming soon');
   };
 
   const handleUpdatePayment = () => {
-    toast.info('Payment method update feature coming soon');
+    toast.success('Payment method update feature coming soon');
   };
 
   const tabs = [

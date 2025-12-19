@@ -82,7 +82,7 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
   }, []);
   useEffect(() => {
     if (invoice && isEditing) {
-      setInvoiceNumber(invoice.invoiceNumber);
+      setInvoiceNumber(invoice.invoiceNumber || '');
       setIssueDate(invoice.issueDate);
       setDueDate(invoice.dueDate || '');
       setCurrency(invoice.currency || 'USD');

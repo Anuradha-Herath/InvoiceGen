@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 import { DollarSign, FileText, Clock, CheckCircle } from 'lucide-react';
 import { invoiceService } from '@/services/invoice';
 import { Invoice } from '@/types/invoice';
-import { mockInvoices } from '@/mocks/invoices';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { InvoicesTable } from '@/components/dashboard/InvoicesTable';
@@ -15,7 +14,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isMockData, setIsMockData] = useState(false);
   const [stats, setStats] = useState({
     totalInvoices: 0,
     paidInvoices: 0,
@@ -32,16 +30,11 @@ export default function DashboardPage() {
       const response = await invoiceService.list();
       const invoicesList = response.items || [];
       setInvoices(invoicesList);
-      setIsMockData(false);
       calculateStats(invoicesList);
     } catch (error: any) {
-      console.warn('Backend not available, using mock data');
-      setInvoices(mockInvoices);
-      setIsMockData(true);
-      calculateStats(mockInvoices);
-      toast.success('Using mock data - Connect your backend to see real data', {
-        duration: 4000,
-      });
+      console.error('Failed to fetch invoices:', error);
+      toast.error('Failed to load invoices. Please ensure your backend is running.');
+      setInvoices([]);
     } finally {
       setIsLoading(false);
     }
@@ -111,14 +104,6 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        {isMockData && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              📋 <strong>Using mock data.</strong> Start your backend server to use real data.
-            </p>
-          </div>
-        )}
-
         {/* Header */}
         <DashboardHeader onCreateInvoice={handleCreateInvoice} />
 

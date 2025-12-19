@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Invoice } from '@/types/invoice';
-import { InvoicesTable } from './InvoicesTable';
+import { InvoicesTable } from '@/components/dashboard/InvoicesTable';
 import { Button } from '@/components/ui/Button';
 
 interface PaginationState {
@@ -119,10 +119,34 @@ export const InvoiceListPageWithPagination = () => {
   const hasPreviousPage = pageHistory.length > 0;
   const hasNextPage = !!currentPage.lastKey; // Only if response included lastKey
 
+  // Handler functions for the table
+  const handleViewInvoice = (invoice: Invoice) => {
+    console.log('View invoice:', invoice.id);
+  };
+
+  const handleDownloadInvoice = (invoice: Invoice) => {
+    console.log('Download invoice:', invoice.id);
+  };
+
+  const handleSendEmail = (invoice: Invoice) => {
+    console.log('Send email for invoice:', invoice.id);
+  };
+
+  const handleViewAll = () => {
+    handleReset();
+  };
+
   return (
     <div className="space-y-6">
       {/* Table */}
-      <InvoicesTable invoices={currentPage.items} loading={loading} />
+      <InvoicesTable 
+        invoices={currentPage.items} 
+        isLoading={loading}
+        onViewInvoice={handleViewInvoice}
+        onDownloadInvoice={handleDownloadInvoice}
+        onSendEmail={handleSendEmail}
+        onViewAll={handleViewAll}
+      />
 
       {/* Pagination Controls */}
       <div className="flex items-center justify-between border-t pt-4">
@@ -145,7 +169,7 @@ export const InvoiceListPageWithPagination = () => {
 
           {/* Navigation Buttons */}
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={handlePreviousPage}
             disabled={!hasPreviousPage || loading}
@@ -156,7 +180,7 @@ export const InvoiceListPageWithPagination = () => {
           </Button>
 
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={handleNextPage}
             disabled={!hasNextPage || loading}

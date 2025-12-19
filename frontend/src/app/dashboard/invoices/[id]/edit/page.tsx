@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { invoiceService } from '@/services/invoice';
 import { Invoice } from '@/types/invoice';
-import { mockInvoices } from '@/mocks/invoices';
 import { CreateInvoice } from '@/components/invoice/CreateInvoice';
 
 export default function EditInvoicePage() {
@@ -21,7 +20,6 @@ export default function EditInvoicePage() {
 
   const fetchInvoice = async () => {
     try {
-      // Try to fetch from API first
       const response = await invoiceService.list();
       const invoicesList = response.items || [];
       const foundInvoice = invoicesList.find((inv) => inv.id === invoiceId);
@@ -29,21 +27,11 @@ export default function EditInvoicePage() {
       if (foundInvoice) {
         setInvoice(foundInvoice);
       } else {
-        throw new Error('Invoice not found');
-      }
-    } catch (error: any) {
-      console.warn('Backend not available, using mock data');
-      // Fall back to mock data
-      const mockInvoice = mockInvoices.find((inv) => inv.id === invoiceId);
-
-      if (mockInvoice) {
-        setInvoice(mockInvoice);
-        toast.success('Using mock data', {
-          duration: 3000,
-        });
-      } else {
         toast.error('Invoice not found');
       }
+    } catch (error: any) {
+      console.error('Failed to fetch invoice:', error);
+      toast.error('Failed to load invoice. Please ensure your backend is running.');
     } finally {
       setIsLoading(false);
     }
