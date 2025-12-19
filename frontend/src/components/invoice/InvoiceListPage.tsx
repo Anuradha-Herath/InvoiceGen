@@ -49,8 +49,6 @@ export function InvoiceListPage({ onNavigate }: InvoiceListPageProps) {
     }
   };
 
-  const [hasNextPage, setHasNextPage] = useState(false);
-
   // Load invoices on mount and when filters change
   useEffect(() => {
     fetchInvoices();

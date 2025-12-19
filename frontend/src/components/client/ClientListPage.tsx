@@ -22,7 +22,7 @@ interface ClientListPageProps {
   onClientAdded?: (client: Client) => void;
 }
 
-const mockClients: Client[] = [];
+const mockClients: Client[] = [
   {
     id: '1',
     name: 'Acme Corporation',

@@ -72,6 +72,17 @@ custom:
   userPoolId: ${env:USER_POOL_ID, 'YOUR_COGNITO_USER_POOL_ID'}
   userPoolClientId: ${env:USER_POOL_CLIENT_ID, 'YOUR_COGNITO_CLIENT_ID'}
   
+  cors:
+    origin: '*'
+    headers:
+      - Content-Type
+      - X-Amz-Date
+      - Authorization
+      - X-Api-Key
+      - X-Amz-Security-Token
+    allowCredentials: false
+    maxAge: 86400
+  
   esbuild:
     bundle: true
     minify: true
@@ -99,7 +110,7 @@ functions:
       - http:
           path: /auth/signup
           method: post
-          cors: true
+          cors: ${self:custom.cors}
 
   login:
     handler: functions/auth/login.handler
@@ -107,7 +118,7 @@ functions:
       - http:
           path: /auth/login
           method: post
-          cors: true
+          cors: ${self:custom.cors}
 
   # Invoice CRUD operations
   createInvoice:
@@ -116,7 +127,7 @@ functions:
       - http:
           path: /invoices
           method: post
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -128,7 +139,7 @@ functions:
       - http:
           path: /invoices/{invoiceId}
           method: get
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -140,7 +151,7 @@ functions:
       - http:
           path: /invoices
           method: get
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -152,7 +163,7 @@ functions:
       - http:
           path: /invoices/{invoiceId}
           method: put
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -164,7 +175,7 @@ functions:
       - http:
           path: /invoices/{invoiceId}
           method: delete
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -176,7 +187,7 @@ functions:
       - http:
           path: /invoices/{invoiceId}/status
           method: patch
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -189,7 +200,7 @@ functions:
       - http:
           path: /clients
           method: post
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -201,7 +212,7 @@ functions:
       - http:
           path: /clients/{clientId}
           method: get
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -213,7 +224,7 @@ functions:
       - http:
           path: /clients
           method: get
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -225,7 +236,7 @@ functions:
       - http:
           path: /clients/{clientId}
           method: put
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -237,7 +248,7 @@ functions:
       - http:
           path: /clients/{clientId}
           method: delete
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -247,12 +258,12 @@ functions:
   generatePDF:
     handler: functions/pdf/generate.handler
     memorySize: 1024
-    timeout: 60
+    timeout: 29
     events:
       - http:
           path: /invoices/{invoiceId}/pdf
           method: post
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -265,7 +276,7 @@ functions:
       - http:
           path: /invoices/{invoiceId}/email
           method: post
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -278,7 +289,7 @@ functions:
       - http:
           path: /settings/profile
           method: get
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -290,7 +301,7 @@ functions:
       - http:
           path: /settings/profile
           method: put
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -302,7 +313,7 @@ functions:
       - http:
           path: /settings/company
           method: get
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -314,7 +325,7 @@ functions:
       - http:
           path: /settings/company
           method: put
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -326,7 +337,7 @@ functions:
       - http:
           path: /settings/email-template
           method: get
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -338,7 +349,7 @@ functions:
       - http:
           path: /settings/email-template
           method: put
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -350,7 +361,7 @@ functions:
       - http:
           path: /settings/change-password
           method: post
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:
@@ -362,7 +373,7 @@ functions:
       - http:
           path: /settings/upload-logo
           method: post
-          cors: true
+          cors: ${self:custom.cors}
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId:

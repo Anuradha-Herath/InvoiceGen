@@ -15,10 +15,10 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    // TODO: Re-enable authentication check once frontend development is complete
-    // if (!authService.isAuthenticated()) {
-    //   router.push('/auth/login');
-    // }
+    // Check if user is authenticated
+    if (!authService.isAuthenticated()) {
+      router.push('/auth/login');
+    }
   }, [router]);
 
   return (

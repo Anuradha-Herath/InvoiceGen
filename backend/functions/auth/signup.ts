@@ -14,8 +14,15 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const body: SignupRequest = JSON.parse(event.body || '{}');
     const { email, password, name } = body;
 
+    console.log('Signup attempt for:', email);
+
     if (!email || !password || !name) {
       return errorResponse(400, 'Email, password, and name are required');
+    }
+
+    // Validate password strength
+    if (password.length < 8) {
+      return errorResponse(400, 'Password must be at least 8 characters');
     }
 
     // Sign up user in Cognito
@@ -29,7 +36,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       ],
     });
 
+    console.log('Sending signup command to Cognito...');
     const signUpResult = await cognitoClient.send(signUpCommand);
+    console.log('Cognito signup successful:', signUpResult.UserSub);
 
     // Create user record in DynamoDB
     const userId = uuidv4();
@@ -45,7 +54,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       },
     });
 
+    console.log('Inserting user into DynamoDB...');
     await dynamoClient.send(putCommand);
+    console.log('User created successfully:', userId);
 
     return successResponse({
       message: 'User created successfully',
