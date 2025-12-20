@@ -1,7 +1,8 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
 import { errorResponse, successResponse } from '@/libs/response';
@@ -78,7 +79,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     await s3Client.send(uploadCommand);
 
-    const pdfUrl = `https://${process.env.INVOICES_BUCKET}.s3.${process.env.REGION}.amazonaws.com/${s3Key}`;
+    // Generate presigned URL valid for 24 hours
+    const getObjectCommand = new GetObjectCommand({
+      Bucket: process.env.INVOICES_BUCKET,
+      Key: s3Key,
+    });
+    const pdfUrl = await getSignedUrl(s3Client, getObjectCommand, { expiresIn: 86400 });
 
     // Update invoice with PDF URL
     const updateCommand = new UpdateCommand({

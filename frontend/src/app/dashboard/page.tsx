@@ -62,12 +62,31 @@ export default function DashboardPage() {
     router.push(`/dashboard/invoices/${invoice.id}`);
   };
 
-  const handleDownloadInvoice = (invoice: Invoice) => {
-    toast.success('Download feature coming soon');
+  const handleDownloadInvoice = async (invoice: Invoice) => {
+    try {
+      const result = await invoiceService.generatePDF(invoice.id);
+      if (result.pdfUrl) {
+        window.open(result.pdfUrl, '_blank');
+        toast.success('PDF generated successfully');
+      }
+    } catch (error: any) {
+      console.error('Failed to generate PDF:', error);
+      toast.error(error.response?.data?.message || 'Failed to generate PDF');
+    }
   };
 
-  const handleSendEmail = (invoice: Invoice) => {
-    toast.success('Email feature coming soon');
+  const handleSendEmail = async (invoice: Invoice) => {
+    try {
+      const email = prompt('Enter recipient email address:');
+      if (!email) return;
+      
+      const message = prompt('Enter message (optional):');
+      await invoiceService.emailInvoice(invoice.id, email, message || undefined);
+      toast.success('Invoice sent successfully');
+    } catch (error: any) {
+      console.error('Failed to send invoice:', error);
+      toast.error(error.response?.data?.message || 'Failed to send invoice');
+    }
   };
 
   const handleViewAll = () => {

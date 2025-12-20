@@ -8,6 +8,7 @@ import { Badge } from '../ui/Badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui/Table';
 import { Invoice } from '@/types/invoice';
 import { apiClient } from '@/services/api';
+import { invoiceService } from '@/services/invoice';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
@@ -105,22 +106,14 @@ export function InvoiceListPage({ onNavigate, invoices: initialInvoices, isLoadi
     }
 
     try {
-      const response = await apiClient.get(`/invoices/${invoice.id}/generate-pdf`, {
-        responseType: 'blob',
-      });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${invoice.invoiceNumber || 'invoice'}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode?.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success('PDF downloaded successfully');
-    } catch (error) {
-      console.error('Failed to download PDF:', error);
-      toast.error('Failed to download PDF');
+      const result = await invoiceService.generatePDF(invoice.id);
+      if (result.pdfUrl) {
+        window.open(result.pdfUrl, '_blank');
+        toast.success('PDF generated successfully');
+      }
+    } catch (error: any) {
+      console.error('Failed to generate PDF:', error);
+      toast.error(error.response?.data?.message || 'Failed to generate PDF');
     }
   };
 
@@ -131,7 +124,11 @@ export function InvoiceListPage({ onNavigate, invoices: initialInvoices, isLoadi
     }
 
     try {
-      await apiClient.post(`/invoices/${invoice.id}/send-email`);
+      const email = prompt('Enter recipient email address:');
+      if (!email) return;
+      
+      const message = prompt('Enter message (optional):');
+      await invoiceService.emailInvoice(invoice.id, email, message || undefined);
       toast.success('Invoice sent successfully');
       fetchInvoices();
     } catch (error: any) {

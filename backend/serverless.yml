@@ -2,6 +2,9 @@ service: invoice-generator-api
 
 frameworkVersion: '3'
 
+package:
+  individually: true
+
 provider:
   name: aws
   runtime: nodejs18.x
@@ -85,13 +88,15 @@ custom:
   
   esbuild:
     bundle: true
-    minify: true
+    minify: false
     sourcemap: true
     exclude:
       - aws-sdk
     target: node18
     platform: node
     concurrency: 10
+    external:
+      - '@sparticuz/chromium'
   
   serverless-offline:
     httpPort: 3001
@@ -259,6 +264,16 @@ functions:
     handler: functions/pdf/generate.handler
     memorySize: 1024
     timeout: 29
+    package:
+      patterns:
+        - 'functions/pdf/**'
+        - 'libs/**'
+        - 'models/**'
+        - 'node_modules/@sparticuz/**'
+        - 'node_modules/puppeteer-core/**'
+        - 'node_modules/@aws-sdk/**'
+        - '!node_modules/**/.bin'
+        - '!node_modules/**/test/**'
     events:
       - http:
           path: /invoices/{invoiceId}/pdf

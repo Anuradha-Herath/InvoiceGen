@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Download, Mail, Edit2, FileText } from 'lucide-react';
 import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
@@ -6,6 +6,7 @@ import { Badge } from '../ui/Badge';
 import { Invoice } from '@/types/invoice';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { invoiceService } from '@/services/invoice';
 
 interface InvoiceDetailPageProps {
   invoice: Invoice;
@@ -13,6 +14,8 @@ interface InvoiceDetailPageProps {
 
 export function InvoiceDetailPage({ invoice }: InvoiceDetailPageProps) {
   const router = useRouter();
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isSending, setIsSending] = useState(false);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -33,12 +36,37 @@ export function InvoiceDetailPage({ invoice }: InvoiceDetailPageProps) {
     router.push(`/dashboard/invoices/${invoice.id}/edit`);
   };
 
-  const handleDownload = () => {
-    toast.success('PDF download feature coming soon');
+  const handleDownload = async () => {
+    try {
+      setIsDownloading(true);
+      const result = await invoiceService.generatePDF(invoice.id);
+      if (result.pdfUrl) {
+        window.open(result.pdfUrl, '_blank');
+        toast.success('PDF generated successfully');
+      }
+    } catch (error: any) {
+      console.error('Failed to generate PDF:', error);
+      toast.error(error.response?.data?.message || 'Failed to generate PDF');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
-  const handleSend = () => {
-    toast.success('Email sending feature coming soon');
+  const handleSend = async () => {
+    try {
+      setIsSending(true);
+      const email = prompt('Enter recipient email address:');
+      if (!email) return;
+      
+      const message = prompt('Enter message (optional):');
+      await invoiceService.emailInvoice(invoice.id, email, message || undefined);
+      toast.success('Invoice sent successfully');
+    } catch (error: any) {
+      console.error('Failed to send invoice:', error);
+      toast.error(error.response?.data?.message || 'Failed to send invoice');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleBack = () => {
@@ -76,13 +104,13 @@ export function InvoiceDetailPage({ invoice }: InvoiceDetailPageProps) {
             <Edit2 className="w-4 h-4" />
             Edit
           </Button>
-          <Button variant="secondary" size="sm" onClick={handleDownload}>
+          <Button variant="secondary" size="sm" onClick={handleDownload} disabled={isDownloading}>
             <Download className="w-4 h-4" />
-            Download
+            {isDownloading ? 'Generating...' : 'Download'}
           </Button>
-          <Button size="sm" onClick={handleSend}>
+          <Button size="sm" onClick={handleSend} disabled={isSending}>
             <Mail className="w-4 h-4" />
-            Send
+            {isSending ? 'Sending...' : 'Send'}
           </Button>
         </div>
       </div>
