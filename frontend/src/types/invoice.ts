@@ -21,6 +21,7 @@ export interface Invoice {
   subtotal: number;
   tax?: number;
   taxRate?: number;
+  discount?: number;
   total: number;
   currency: string;
   issueDate: string;
@@ -39,6 +40,7 @@ export interface CreateInvoiceRequest {
   subtotal: number;
   tax?: number;
   taxRate?: number;
+  discount?: number;
   total: number;
   currency: string;
   issueDate: string;

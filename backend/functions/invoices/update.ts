@@ -14,7 +14,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return errorResponse(401, 'Unauthorized');
     }
 
-    const invoiceId = event.pathParameters?.id;
+    const invoiceId = event.pathParameters?.invoiceId;
     if (!invoiceId) {
       return errorResponse(400, 'Invoice ID is required');
     }
@@ -35,6 +35,39 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     }
 
     const body: UpdateInvoiceRequest = JSON.parse(event.body || '{}');
+
+    console.log('Update invoice request:', {
+      invoiceId,
+      userId,
+      bodyKeys: Object.keys(body),
+    });
+
+    // Basic validation for update data
+    if (body.items && (!Array.isArray(body.items) || body.items.length === 0)) {
+      return errorResponse(400, 'Items must be a non-empty array');
+    }
+
+    if (body.items) {
+      for (const item of body.items) {
+        if (!item.description || item.quantity <= 0 || item.unitPrice < 0) {
+          return errorResponse(400, 'Invalid item data: description required, quantity must be > 0, unitPrice must be >= 0');
+        }
+      }
+    }
+
+    if (body.client) {
+      if (!body.client.name || !body.client.email) {
+        return errorResponse(400, 'Client must have name and email');
+      }
+    }
+
+    if (body.total !== undefined && body.total < 0) {
+      return errorResponse(400, 'Total must be >= 0');
+    }
+
+    if (body.currency && body.currency.length !== 3) {
+      return errorResponse(400, 'Currency must be a 3-letter code');
+    }
 
     // Build update expression dynamically
     const updateExpressions: string[] = [];

@@ -20,6 +20,9 @@ class ApiClient {
           if (tokens) {
             const { idToken } = JSON.parse(tokens) as AuthTokens;
             config.headers.Authorization = `Bearer ${idToken}`;
+          } else if (process.env.NEXT_PUBLIC_API_URL?.includes('localhost')) {
+            // For local development, use a test user ID
+            config.headers['X-User-Id'] = 'local-test-user-' + Math.random().toString(36).substr(2, 9);
           }
         }
         return config;

@@ -2,17 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import toast from 'react-hot-toast';
+import { DollarSign, FileText, Clock, CheckCircle } from 'lucide-react';
 import { invoiceService } from '@/services/invoice';
-import { authService } from '@/services/auth';
 import { Invoice } from '@/types/invoice';
-import { format } from 'date-fns';
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { StatCard } from '@/components/dashboard/StatCard';
+import { InvoicesTable } from '@/components/dashboard/InvoicesTable';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalInvoices: 0,
+    paidInvoices: 0,
+    pendingInvoices: 0,
+    totalRevenue: 0,
+  });
 
   useEffect(() => {
     fetchInvoices();
@@ -21,114 +28,117 @@ export default function DashboardPage() {
   const fetchInvoices = async () => {
     try {
       const response = await invoiceService.list();
-      setInvoices(response.items);
+      const invoicesList = response.items || [];
+      setInvoices(invoicesList);
+      calculateStats(invoicesList);
     } catch (error: any) {
-      toast.error('Failed to load invoices');
+      console.error('Failed to fetch invoices:', error);
+      toast.error('Failed to load invoices. Please ensure your backend is running.');
+      setInvoices([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    authService.logout();
+  const calculateStats = (invoicesList: Invoice[]) => {
+    const totalInvoices = invoicesList.length;
+    const paidInvoices = invoicesList.filter((inv) => inv.status === 'paid').length;
+    const pendingInvoices = invoicesList.filter((inv) => inv.status === 'sent' || inv.status === 'draft').length;
+    const totalRevenue = invoicesList.reduce((sum, inv) => sum + inv.total, 0);
+
+    setStats({
+      totalInvoices,
+      paidInvoices,
+      pendingInvoices,
+      totalRevenue,
+    });
   };
 
-  const getStatusColor = (status: string) => {
-    const colors = {
-      draft: 'bg-gray-100 text-gray-800',
-      generated: 'bg-blue-100 text-blue-800',
-      sent: 'bg-yellow-100 text-yellow-800',
-      paid: 'bg-green-100 text-green-800',
-    };
-    return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+  const handleCreateInvoice = () => {
+    router.push('/dashboard/invoices/new');
   };
+
+  const handleViewInvoice = (invoice: Invoice) => {
+    router.push(`/dashboard/invoices/${invoice.id}`);
+  };
+
+  const handleDownloadInvoice = async (invoice: Invoice) => {
+    try {
+      const result = await invoiceService.generatePDF(invoice.id);
+      if (result.pdfUrl) {
+        window.open(result.pdfUrl, '_blank');
+        toast.success('PDF generated successfully');
+      }
+    } catch (error: any) {
+      console.error('Failed to generate PDF:', error);
+      toast.error(error.response?.data?.message || 'Failed to generate PDF');
+    }
+  };
+
+  const handleSendEmail = (invoice: Invoice) => {
+    router.push(`/dashboard/invoices/${invoice.id}`);
+  };
+
+  const handleViewAll = () => {
+    router.push('/dashboard/invoices');
+  };
+
+  const statsData = [
+    {
+      label: 'Total Invoices',
+      value: stats.totalInvoices.toString(),
+      icon: FileText,
+      color: 'bg-blue-600',
+    },
+    {
+      label: 'Paid Invoices',
+      value: stats.paidInvoices.toString(),
+      icon: CheckCircle,
+      color: 'bg-green-600',
+    },
+    {
+      label: 'Pending',
+      value: stats.pendingInvoices.toString(),
+      icon: Clock,
+      color: 'bg-amber-600',
+    },
+    {
+      label: 'Total Revenue',
+      value: `$${stats.totalRevenue.toFixed(2)}`,
+      icon: DollarSign,
+      color: 'bg-indigo-600',
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Invoice Generator</h1>
-            <div className="flex gap-4">
-              <Link
-                href="/dashboard/invoices/new"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                New Invoice
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <main className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Header */}
+        <DashboardHeader onCreateInvoice={handleCreateInvoice} />
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Invoices</h2>
-
-          {isLoading ? (
-            <div className="text-center py-12">Loading...</div>
-          ) : invoices.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 mb-4">No invoices yet</p>
-              <Link
-                href="/dashboard/invoices/new"
-                className="text-blue-600 hover:text-blue-700"
-              >
-                Create your first invoice
-              </Link>
-            </div>
-          ) : (
-            <div className="bg-white shadow overflow-hidden sm:rounded-md">
-              <ul className="divide-y divide-gray-200">
-                {invoices.map((invoice) => (
-                  <li key={invoice.id}>
-                    <Link
-                      href={`/dashboard/invoices/${invoice.id}`}
-                      className="block hover:bg-gray-50 p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-blue-600 truncate">
-                              {invoice.invoiceNumber || `Invoice #${invoice.id.slice(0, 8)}`}
-                            </p>
-                            <div className="ml-2 flex-shrink-0 flex">
-                              <p className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
-                                {invoice.status}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="mt-2 sm:flex sm:justify-between">
-                            <div className="sm:flex">
-                              <p className="flex items-center text-sm text-gray-500">
-                                {invoice.client.name}
-                              </p>
-                            </div>
-                            <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                              <p>
-                                {invoice.currency} {invoice.total.toFixed(2)}
-                              </p>
-                              <p className="ml-4">
-                                {format(new Date(invoice.issueDate), 'MMM d, yyyy')}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {statsData.map((stat, index) => (
+            <StatCard
+              key={index}
+              label={stat.label}
+              value={stat.value}
+              icon={stat.icon}
+              color={stat.color}
+            />
+          ))}
         </div>
-      </main>
-    </div>
+
+        {/* Recent Invoices Table */}
+        <InvoicesTable
+          invoices={invoices}
+          onViewInvoice={handleViewInvoice}
+          onDownloadInvoice={handleDownloadInvoice}
+          onSendEmail={handleSendEmail}
+          onViewAll={handleViewAll}
+          isLoading={isLoading}
+        />
+      </div>
+    </main>
   );
 }
