@@ -34,8 +34,8 @@ export default function SignupPage() {
         password: data.password,
         name: data.name,
       });
-      toast.success('Account created successfully! Please login.');
-      router.push('/auth/login');
+      toast.success('Account created! Please verify your email.');
+      router.push(`/auth/verify-email?email=${encodeURIComponent(data.email)}`);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Signup failed');
     } finally {

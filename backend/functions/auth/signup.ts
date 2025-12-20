@@ -41,7 +41,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     console.log('Cognito signup successful:', signUpResult.UserSub);
 
     // Create user record in DynamoDB
-    const userId = uuidv4();
+    const userId = signUpResult.UserSub;  // Use Cognito SUB as user ID for consistency
     const putCommand = new PutCommand({
       TableName: process.env.USERS_TABLE,
       Item: {

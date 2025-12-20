@@ -346,7 +346,41 @@ export function SettingsPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Company Information</CardTitle>
+              <CardTitle>Current Company Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Business Name:</span>
+                  <span className="text-gray-900 font-medium">{company.name || '-'}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Email:</span>
+                  <span className="text-gray-900 font-medium">{company.email || '-'}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Phone:</span>
+                  <span className="text-gray-900 font-medium">{company.phone || '-'}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Address:</span>
+                  <span className="text-gray-900 font-medium">{company.address || '-'}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Website:</span>
+                  <span className="text-gray-900 font-medium">{company.website || '-'}</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-gray-600">Tax ID:</span>
+                  <span className="text-gray-900 font-medium">{company.taxId || '-'}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Edit Company Information</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">

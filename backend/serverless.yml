@@ -125,6 +125,22 @@ functions:
           method: post
           cors: ${self:custom.cors}
 
+  confirmSignup:
+    handler: functions/auth/confirm-signup.handler
+    events:
+      - http:
+          path: /auth/confirm-signup
+          method: post
+          cors: ${self:custom.cors}
+
+  resendConfirmation:
+    handler: functions/auth/resend-confirmation.handler
+    events:
+      - http:
+          path: /auth/resend-confirmation
+          method: post
+          cors: ${self:custom.cors}
+
   # Invoice CRUD operations
   createInvoice:
     handler: functions/invoices/create.handler
