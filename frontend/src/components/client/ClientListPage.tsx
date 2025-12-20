@@ -86,7 +86,7 @@ export function ClientListPage({ onClientAdded }: ClientListPageProps) {
     setIsLoading(true);
     try {
       const response = await apiClient.get('/clients');
-      const clientList = response.data.data || [];
+      const clientList = response.data.items || [];
       setClients(clientList);
     } catch (error) {
       console.error('Failed to load clients:', error);
@@ -162,14 +162,14 @@ export function ClientListPage({ onClientAdded }: ClientListPageProps) {
         } else {
           toast.success(`${formData.name} added successfully`);
           if (onClientAdded) {
-            onClientAdded(response.data.data);
+            onClientAdded(response.data);
           }
         }
         loadClients();
         handleCloseModal();
       })
       .catch((error) => {
-        const message = error.response?.data?.message || 'Failed to save client';
+        const message = error.response?.data?.error || error.response?.data?.message || 'Failed to save client';
         toast.error(message);
       })
       .finally(() => {
@@ -187,7 +187,7 @@ export function ClientListPage({ onClientAdded }: ClientListPageProps) {
           loadClients();
         })
         .catch((error) => {
-          const message = error.response?.data?.message || 'Failed to delete client';
+          const message = error.response?.data?.error || error.response?.data?.message || 'Failed to delete client';
           toast.error(message);
         })
         .finally(() => {

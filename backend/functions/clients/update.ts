@@ -35,8 +35,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return errorResponse(400, error.details[0].message);
     }
 
+    // Filter out empty strings to avoid updating with empty values
+    const filteredValue: any = {};
+    Object.entries(value).forEach(([key, val]) => {
+      if (val !== '') {
+        filteredValue[key] = val;
+      }
+    });
+
+    if (Object.keys(filteredValue).length === 0) {
+      return errorResponse(400, 'At least one field must be provided for update');
+    }
+
     const now = new Date().toISOString();
-    const updateExpression = Object.keys(value)
+    const updateExpression = Object.keys(filteredValue)
       .map((key) => `${key} = :${key}`)
       .join(', ');
 
@@ -44,7 +56,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       ':updatedAt': now,
     };
 
-    Object.entries(value).forEach(([key, val]) => {
+    Object.entries(filteredValue).forEach(([key, val]) => {
       expressionAttributeValues[`:${key}`] = val;
     });
 

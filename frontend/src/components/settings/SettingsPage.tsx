@@ -45,18 +45,18 @@ export function SettingsPage() {
     try {
       // Load profile
       const profileResponse = await apiClient.get('/settings/profile');
-      if (profileResponse.data.data) {
+      if (profileResponse.data) {
         setProfile((prev) => ({
           ...prev,
-          name: profileResponse.data.data.name || '',
-          email: profileResponse.data.data.email || '',
+          name: profileResponse.data.name || '',
+          email: profileResponse.data.email || '',
         }));
       }
 
       // Load company settings
       const companyResponse = await apiClient.get('/settings/company');
-      if (companyResponse.data.data) {
-        const companyData = companyResponse.data.data;
+      if (companyResponse.data) {
+        const companyData = companyResponse.data;
         setCompany({
           name: companyData.name || '',
           address: companyData.address || '',
@@ -73,10 +73,10 @@ export function SettingsPage() {
 
       // Load email template
       const emailResponse = await apiClient.get('/settings/email-template');
-      if (emailResponse.data.data) {
+      if (emailResponse.data) {
         setEmailSettings({
-          subject: emailResponse.data.data.subject || '',
-          message: emailResponse.data.data.message || '',
+          subject: emailResponse.data.subject || '',
+          message: emailResponse.data.message || '',
         });
       }
     } catch (error) {
@@ -224,7 +224,7 @@ export function SettingsPage() {
         toast.success('Logo uploaded successfully');
         setCompany((prev) => ({
           ...prev,
-          logoUrl: response.data.data.logoUrl,
+          logoUrl: response.data.logoUrl,
         }));
       })
       .catch((error) => {

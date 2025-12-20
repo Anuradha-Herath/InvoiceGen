@@ -95,13 +95,15 @@ export const validateAndNormalizeInvoice = (data: CreateInvoiceRequest): {
   }
 
   // Validate total
-  const discountAmount = (value.discount || 0);
+  // Calculate discount amount from discount percentage
+  const discountPercentage = (value.discount || 0);
+  const discountAmount = Math.round(calculatedSubtotal * (discountPercentage / 100) * 100) / 100;
   const taxAmount = value.tax || 0;
   const expectedTotal = Math.round((calculatedSubtotal - discountAmount + taxAmount) * 100) / 100;
   const providedTotal = Math.round(value.total * 100) / 100;
   if (Math.abs(expectedTotal - providedTotal) > 0.01) {
     errors.push(
-      `Total should be ${expectedTotal} (subtotal - discount + tax), but got ${providedTotal}`
+      `Total should be ${expectedTotal} (subtotal - (subtotal × discount%) + tax), but got ${providedTotal}`
     );
   }
 

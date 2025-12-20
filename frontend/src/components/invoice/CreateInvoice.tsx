@@ -23,9 +23,9 @@ interface CreateInvoiceProps {
 }
 
 interface CreateInvoicePayload {
-  invoiceNumber: string;
+  invoiceNumber?: string;
   issueDate: string;
-  dueDate: string;
+  dueDate?: string;
   currency: string;
   client: {
     name: string;
@@ -40,10 +40,13 @@ interface CreateInvoicePayload {
     unitPrice: number;
     amount: number;
   }>;
-  taxRate: number;
-  discount: number;
-  notes: string;
-  status: 'draft' | 'generated' | 'sent' | 'paid';
+  subtotal: number;
+  tax?: number;
+  taxRate?: number;
+  discount?: number;
+  total: number;
+  notes?: string;
+  status?: 'draft' | 'generated' | 'sent' | 'paid';
 }
 
 export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvoiceProps) {
@@ -73,18 +76,30 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
     const loadClients = async () => {
       try {
         const response = await apiClient.get('/clients');
-        setClients(response.data.data || []);
+        setClients(response.data.items || []);
       } catch (error) {
         console.error('Failed to load clients:', error);
       }
     };
     loadClients();
   }, []);
+
+  // Helper function to format date from ISO to yyyy-MM-dd
+  const formatDateInput = (dateString: string | undefined): string => {
+    if (!dateString) return '';
+    // If it's already in yyyy-MM-dd format, return as is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+    // If it's in ISO format, extract just the date part
+    return dateString.split('T')[0];
+  };
+
   useEffect(() => {
     if (invoice && isEditing) {
       setInvoiceNumber(invoice.invoiceNumber || '');
-      setIssueDate(invoice.issueDate);
-      setDueDate(invoice.dueDate || '');
+      setIssueDate(formatDateInput(invoice.issueDate));
+      setDueDate(formatDateInput(invoice.dueDate || ''));
       setCurrency(invoice.currency || 'USD');
       setClientName(invoice.client?.name || '');
       setClientEmail(invoice.client?.email || '');
@@ -143,10 +158,21 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
 
   // Create payload for API
   const createInvoicePayload = (): CreateInvoicePayload => {
-    return {
-      invoiceNumber,
-      issueDate,
-      dueDate,
+    // Convert ISO date format to yyyy-MM-dd format
+    const formatDateForBackend = (dateString: string): string => {
+      if (!dateString) return '';
+      // If it's already in yyyy-MM-dd format, return as is
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        return dateString;
+      }
+      // If it's in ISO format, extract just the date part
+      return dateString.split('T')[0];
+    };
+
+    const payload: any = {
+      invoiceNumber: invoiceNumber || undefined,
+      issueDate: formatDateForBackend(issueDate),
+      dueDate: dueDate ? formatDateForBackend(dueDate) : undefined,
       currency,
       client: {
         name: clientName,
@@ -161,11 +187,20 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
         unitPrice: item.unitPrice,
         amount: Math.round(item.quantity * item.unitPrice * 100) / 100,
       })),
-      taxRate,
-      discount,
-      notes,
-      status: 'draft',
+      subtotal,
+      tax: taxAmount,
+      taxRate: taxRate || undefined,
+      discount: discount || undefined,
+      total,
+      notes: notes || undefined,
     };
+
+    // Remove undefined values to avoid validation errors
+    Object.keys(payload).forEach(
+      (key) => payload[key] === undefined && delete payload[key]
+    );
+
+    return payload;
   };
 
   const handleSaveDraft = async () => {
@@ -186,7 +221,24 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
       }
       onBack();
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to save invoice';
+      const errorData = error.response?.data;
+      let message = 'Failed to save invoice';
+      
+      if (typeof errorData === 'string') {
+        message = errorData;
+      } else if (errorData?.error) {
+        message = errorData.error;
+      } else if (errorData?.message) {
+        message = errorData.message;
+      } else if (error.message) {
+        message = error.message;
+      }
+      
+      console.error('Save invoice error details:', {
+        status: error.response?.status,
+        data: errorData,
+        message: message
+      });
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -247,13 +299,14 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
         await apiClient.post(`/invoices/${invoice.id}/send-email`);
       } else {
         const response = await apiClient.post('/invoices', payload);
-        await apiClient.post(`/invoices/${response.data.data.id}/send-email`);
+        await apiClient.post(`/invoices/${response.data.id}/send-email`);
       }
       
       toast.success('Invoice sent successfully!');
       onBack();
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to send invoice';
+      const message = error.response?.data?.error || error.response?.data?.message || 'Failed to send invoice';
+      console.error('Send invoice error:', error.response?.data || error);
       toast.error(message);
     } finally {
       setIsSubmitting(false);

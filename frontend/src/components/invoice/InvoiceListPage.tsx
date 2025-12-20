@@ -18,9 +18,9 @@ interface InvoiceListPageProps {
 }
 
 interface PaginatedResponse {
-  data: Invoice[];
+  items: Invoice[];
   lastKey?: string;
-  total?: number;
+  count?: number;
 }
 
 export function InvoiceListPage({ onNavigate, invoices: initialInvoices, isLoading: initialIsLoading }: InvoiceListPageProps) {
@@ -72,9 +72,9 @@ export function InvoiceListPage({ onNavigate, invoices: initialInvoices, isLoadi
       }
 
       const response = await apiClient.get('/invoices', { params });
-      const data: PaginatedResponse = response.data.data || { data: [] };
+      const data = response.data || { items: [] };
 
-      setInvoices(data.data || []);
+      setInvoices(data.items || []);
       setHasNextPage(!!data.lastKey);
     } catch (error) {
       console.error('Failed to load invoices:', error);
