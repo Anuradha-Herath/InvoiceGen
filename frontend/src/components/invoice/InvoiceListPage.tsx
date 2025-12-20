@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Badge } from '../ui/Badge';
+import { Modal } from '../ui/Modal';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui/Table';
 import { Invoice } from '@/types/invoice';
 import { apiClient } from '@/services/api';
@@ -36,6 +37,13 @@ export function InvoiceListPage({ onNavigate, invoices: initialInvoices, isLoadi
   const [currentPage, setCurrentPage] = useState(1);
   const [pageStack, setPageStack] = useState<string[]>(['']);
   const [hasNextPage, setHasNextPage] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const [emailData, setEmailData] = useState({
+    recipientEmail: '',
+    message: '',
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -117,24 +125,57 @@ export function InvoiceListPage({ onNavigate, invoices: initialInvoices, isLoadi
     }
   };
 
-  const handleSendEmail = async (invoice: Invoice) => {
+  const handleSendEmail = (invoice: Invoice) => {
     if (!invoice.id) {
       toast.error('Invoice ID missing');
       return;
     }
+    setSelectedInvoice(invoice);
+    setEmailData({
+      recipientEmail: invoice.client.email || '',
+      message: '',
+    });
+    setShowEmailModal(true);
+  };
+
+  const handleSendEmailSubmit = async () => {
+    if (!selectedInvoice?.id) return;
+
+    if (!emailData.recipientEmail) {
+      toast.error('Please enter a recipient email address');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailData.recipientEmail)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
 
     try {
-      const email = prompt('Enter recipient email address:');
-      if (!email) return;
-      
-      const message = prompt('Enter message (optional):');
-      await invoiceService.emailInvoice(invoice.id, email, message || undefined);
+      setIsSending(true);
+      await invoiceService.emailInvoice(
+        selectedInvoice.id,
+        emailData.recipientEmail,
+        emailData.message || undefined
+      );
       toast.success('Invoice sent successfully');
+      setShowEmailModal(false);
+      setEmailData({ recipientEmail: '', message: '' });
+      setSelectedInvoice(null);
       fetchInvoices();
     } catch (error: any) {
       const message = error.response?.data?.message || 'Failed to send invoice';
       toast.error(message);
+    } finally {
+      setIsSending(false);
     }
+  };
+
+  const handleCloseEmailModal = () => {
+    setShowEmailModal(false);
+    setEmailData({ recipientEmail: '', message: '' });
+    setSelectedInvoice(null);
   };
 
   const handleDeleteInvoice = async (invoice: Invoice) => {
@@ -384,6 +425,53 @@ export function InvoiceListPage({ onNavigate, invoices: initialInvoices, isLoadi
           )}
         </CardContent>
       </Card>
+
+      {/* Email Modal */}
+      <Modal
+        isOpen={showEmailModal}
+        onClose={handleCloseEmailModal}
+        title="Send Invoice via Email"
+        footer={
+          <div className="flex gap-3 justify-end">
+            <Button variant="ghost" onClick={handleCloseEmailModal} disabled={isSending}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendEmailSubmit} disabled={isSending}>
+              {isSending ? 'Sending...' : 'Send Email'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label="Recipient Email"
+            type="email"
+            placeholder="customer@example.com"
+            value={emailData.recipientEmail}
+            onChange={(e) =>
+              setEmailData({ ...emailData, recipientEmail: e.target.value })
+            }
+            required
+          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Message (Optional)
+            </label>
+            <textarea
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+              rows={4}
+              placeholder="Enter a custom message for the email..."
+              value={emailData.message}
+              onChange={(e) =>
+                setEmailData({ ...emailData, message: e.target.value })
+              }
+            />
+          </div>
+          <p className="text-sm text-gray-500">
+            The invoice PDF will be sent to the customer.
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }

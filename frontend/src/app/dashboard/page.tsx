@@ -75,18 +75,8 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSendEmail = async (invoice: Invoice) => {
-    try {
-      const email = prompt('Enter recipient email address:');
-      if (!email) return;
-      
-      const message = prompt('Enter message (optional):');
-      await invoiceService.emailInvoice(invoice.id, email, message || undefined);
-      toast.success('Invoice sent successfully');
-    } catch (error: any) {
-      console.error('Failed to send invoice:', error);
-      toast.error(error.response?.data?.message || 'Failed to send invoice');
-    }
+  const handleSendEmail = (invoice: Invoice) => {
+    router.push(`/dashboard/invoices/${invoice.id}`);
   };
 
   const handleViewAll = () => {
