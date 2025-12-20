@@ -45,9 +45,10 @@ export function InvoiceDetailPage({ invoice }: InvoiceDetailPageProps) {
     router.back();
   };
 
-  // Calculate tax amount
-  const taxAmount = invoice.total > 0 ? (invoice.total - (invoice.total / 1.1)) : 0;
-  const subtotal = invoice.total - taxAmount;
+  // Use actual invoice data instead of calculating
+  const subtotal = invoice.subtotal || 0;
+  const taxAmount = invoice.tax || 0;
+  const discountAmount = invoice.discount || 0;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -175,12 +176,22 @@ export function InvoiceDetailPage({ invoice }: InvoiceDetailPageProps) {
                   {invoice.currency} {subtotal.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between text-gray-600">
-                <span>Tax:</span>
-                <span>
-                  {invoice.currency} {taxAmount.toFixed(2)}
-                </span>
-              </div>
+              {invoice.taxRate ? (
+                <div className="flex justify-between text-gray-600">
+                  <span>Tax ({invoice.taxRate}%):</span>
+                  <span>
+                    {invoice.currency} {taxAmount.toFixed(2)}
+                  </span>
+                </div>
+              ) : null}
+              {discountAmount > 0 ? (
+                <div className="flex justify-between text-gray-600">
+                  <span>Discount ({invoice.discount || 0}%):</span>
+                  <span>
+                    -{invoice.currency} {(subtotal * (invoice.discount || 0) / 100).toFixed(2)}
+                  </span>
+                </div>
+              ) : null}
               <div className="border-t-2 border-gray-300 pt-2 flex justify-between text-gray-900 font-semibold">
                 <span>Total:</span>
                 <span className="text-blue-600 text-lg">

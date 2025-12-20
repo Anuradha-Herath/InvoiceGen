@@ -273,24 +273,28 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
     setIsSubmitting(true);
     try {
       const payload = createInvoicePayload();
-      payload.status = 'generated';
       
-      if (isEditing && invoice?.id) {
-        await apiClient.put(`/invoices/${invoice.id}`, payload);
+      let invoiceId = invoice?.id;
+      
+      // Save invoice first if creating new
+      if (!isEditing) {
+        const response = await apiClient.post('/invoices', payload);
+        invoiceId = response.data.id;
       } else {
-        await apiClient.post('/invoices', payload);
+        // Update existing invoice (without changing status yet)
+        await apiClient.put(`/invoices/${invoice.id}`, payload);
       }
       
-      // Generate PDF
-      if (invoice?.id || true) { // After create, we'd have the ID
-        await apiClient.get(`/invoices/generate-pdf/${invoice?.id || 'temp'}`, {
-          responseType: 'blob',
-        });
+      // Then generate PDF
+      if (invoiceId) {
+        await apiClient.post(`/invoices/${invoiceId}/pdf`);
       }
       
       toast.success('PDF generated successfully!');
+      onBack();
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to generate PDF';
+      const message = error.response?.data?.message || error.response?.data?.error || 'Failed to generate PDF';
+      console.error('Generate PDF error:', error.response?.data || error);
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -306,14 +310,21 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
     setIsSubmitting(true);
     try {
       const payload = createInvoicePayload();
-      payload.status = 'sent';
       
-      if (isEditing && invoice?.id) {
-        await apiClient.put(`/invoices/${invoice.id}`, payload);
-        await apiClient.post(`/invoices/${invoice.id}/send-email`);
-      } else {
+      let invoiceId = invoice?.id;
+      
+      // Save invoice first if creating new
+      if (!isEditing) {
         const response = await apiClient.post('/invoices', payload);
-        await apiClient.post(`/invoices/${response.data.id}/send-email`);
+        invoiceId = response.data.id;
+      } else {
+        // Update existing invoice
+        await apiClient.put(`/invoices/${invoice.id}`, payload);
+      }
+      
+      // Then send email
+      if (invoiceId) {
+        await apiClient.post(`/invoices/${invoiceId}/email`);
       }
       
       toast.success('Invoice sent successfully!');
