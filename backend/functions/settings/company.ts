@@ -31,22 +31,28 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       });
 
       const result = await dynamoClient.send(command);
+      const defaultResponse = {
+        userId,
+        name: undefined,
+        address: undefined,
+        phone: undefined,
+        email: undefined,
+        website: undefined,
+        taxId: undefined,
+        logoUrl: undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
       if (!result.Item) {
-        return successResponse({
-          userId,
-          name: undefined,
-          address: undefined,
-          phone: undefined,
-          email: undefined,
-          website: undefined,
-          taxId: undefined,
-          logoUrl: undefined,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
+        return successResponse(defaultResponse);
       }
 
-      return successResponse(result.Item);
+      // Return all stored fields including logoUrl
+      return successResponse({
+        ...defaultResponse,
+        ...result.Item,
+      });
     }
 
     if (event.requestContext.httpMethod === 'PUT') {

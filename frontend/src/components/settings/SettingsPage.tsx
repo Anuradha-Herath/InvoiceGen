@@ -204,36 +204,56 @@ export function SettingsPage() {
     }
 
     setLogoFile(file);
+    
+    // Read file as base64 and upload
     const reader = new FileReader();
     reader.onload = (e) => {
-      setLogoPreview(e.target?.result as string);
+      const base64Data = e.target?.result as string;
+      setLogoPreview(base64Data);
+      
+      // Extract base64 string (remove data:image/...;base64, prefix)
+      const base64String = base64Data.split(',')[1];
+      
+      setIsLoading(true);
+      apiClient
+        .post('/settings/upload-logo', {
+          imageData: base64String,
+          fileName: file.name,
+          mimeType: file.type,
+        })
+        .then((response) => {
+          console.log('Upload response:', response);
+          console.log('Logo URL from response:', response.data?.logoUrl);
+          
+          const logoUrl = response.data?.logoUrl;
+          if (!logoUrl) {
+            toast.error('Logo uploaded but URL not received from server');
+            console.error('Missing logoUrl in response:', response.data);
+            return;
+          }
+          
+          toast.success('Logo uploaded successfully');
+          setCompany((prev) => ({
+            ...prev,
+            logoUrl: logoUrl,
+          }));
+          // Update preview to show the S3 URL for persistence
+          setLogoPreview(logoUrl);
+          console.log('Logo preview updated to:', logoUrl);
+        })
+        .catch((error) => {
+          console.error('Upload error:', error);
+          const message = error.response?.data?.error || error.response?.data?.message || 'Failed to upload logo';
+          toast.error(message);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    };
+    reader.onerror = () => {
+      toast.error('Failed to read file');
     };
     reader.readAsDataURL(file);
-
-    setIsLoading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
-    apiClient
-      .post('/settings/upload-logo', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
-      .then((response) => {
-        toast.success('Logo uploaded successfully');
-        setCompany((prev) => ({
-          ...prev,
-          logoUrl: response.data.logoUrl,
-        }));
-      })
-      .catch((error) => {
-        const message = error.response?.data?.message || 'Failed to upload logo';
-        toast.error(message);
-      })
-      .finally(() => {
-        setIsLoading(false);
-      });
   };
 
   const handleSaveEmailTemplate = () => {
