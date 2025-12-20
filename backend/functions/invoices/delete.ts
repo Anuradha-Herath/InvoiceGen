@@ -15,7 +15,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return errorResponse(401, 'Unauthorized');
     }
 
-    const invoiceId = event.pathParameters?.id;
+    const invoiceId = event.pathParameters?.invoiceId;
     if (!invoiceId) {
       return errorResponse(400, 'Invoice ID is required');
     }

@@ -158,27 +158,30 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
 
   // Create payload for API
   const createInvoicePayload = (): CreateInvoicePayload => {
-    // Convert ISO date format to yyyy-MM-dd format
-    const formatDateForBackend = (dateString: string): string => {
-      if (!dateString) return '';
-      // If it's already in yyyy-MM-dd format, return as is
+    // Convert yyyy-MM-dd format to ISO date format (required by backend)
+    const formatDateForBackend = (dateString: string): string | undefined => {
+      if (!dateString) return undefined;
+      // If it's in yyyy-MM-dd format, convert to ISO
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        return new Date(dateString + 'T00:00:00.000Z').toISOString();
+      }
+      // If it's already in ISO format, return as is
+      if (dateString.includes('T')) {
         return dateString;
       }
-      // If it's in ISO format, extract just the date part
-      return dateString.split('T')[0];
+      // Fallback: try to parse and convert
+      return new Date(dateString).toISOString();
     };
 
     const payload: any = {
       invoiceNumber: invoiceNumber || undefined,
       issueDate: formatDateForBackend(issueDate),
-      dueDate: dueDate ? formatDateForBackend(dueDate) : undefined,
+      dueDate: formatDateForBackend(dueDate),
       currency,
       client: {
         name: clientName,
         email: clientEmail,
         phone: clientPhone || undefined,
-        company: clientName,
         address: clientAddress || undefined,
       },
       items: items.map((item) => ({
@@ -195,10 +198,21 @@ export function CreateInvoice({ onBack, invoice, isEditing = false }: CreateInvo
       notes: notes || undefined,
     };
 
-    // Remove undefined values to avoid validation errors
-    Object.keys(payload).forEach(
-      (key) => payload[key] === undefined && delete payload[key]
-    );
+    // Remove undefined and null values to avoid validation errors
+    Object.keys(payload).forEach((key) => {
+      if (payload[key] === undefined || payload[key] === null) {
+        delete payload[key];
+      }
+    });
+
+    // Clean up nested client object to remove undefined values
+    if (payload.client) {
+      Object.keys(payload.client).forEach((key) => {
+        if (payload.client[key] === undefined || payload.client[key] === null) {
+          delete payload.client[key];
+        }
+      });
+    }
 
     return payload;
   };

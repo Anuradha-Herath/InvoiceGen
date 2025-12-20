@@ -14,7 +14,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       return errorResponse(401, 'Unauthorized');
     }
 
-    const invoiceId = event.pathParameters?.id;
+    const invoiceId = event.pathParameters?.invoiceId;
     if (!invoiceId) {
       return errorResponse(400, 'Invoice ID is required');
     }
@@ -35,6 +35,12 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     }
 
     const body: UpdateInvoiceRequest = JSON.parse(event.body || '{}');
+
+    console.log('Update invoice request:', {
+      invoiceId,
+      userId,
+      bodyKeys: Object.keys(body),
+    });
 
     // Basic validation for update data
     if (body.items && (!Array.isArray(body.items) || body.items.length === 0)) {
