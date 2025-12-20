@@ -2,14 +2,12 @@ import { APIGatewayProxyHandler } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { errorResponse, successResponse } from '@/libs/response';
 import { getUserIdFromEvent } from '@/libs/auth';
 import { SendEmailRequest } from '@/models/email';
 
 const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.REGION }));
 const sesClient = new SESClient({ region: process.env.SES_REGION || process.env.REGION });
-const s3Client = new S3Client({ region: process.env.REGION });
 
 // Replace template variables with actual values
 const replaceTemplateVariables = (template: string, data: any): string => {
@@ -52,7 +50,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     // Get invoice data
     const getCommand = new GetCommand({
       TableName: process.env.INVOICES_TABLE,
-      Key: { userId, id: invoiceId },
+      Key: { id: invoiceId },
     });
 
     const result = await dynamoClient.send(getCommand);
@@ -107,21 +105,13 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const finalSubject = replaceTemplateVariables(emailSubject, templateData);
     const finalMessage = message || replaceTemplateVariables(emailMessage, templateData);
 
-    // Get PDF from S3
-    const s3Key = `${userId}/${invoiceId}.pdf`;
-    const getObjectCommand = new GetObjectCommand({
-      Bucket: process.env.INVOICES_BUCKET,
-      Key: s3Key,
-    });
+    // Add PDF URL to the email body so customer can download it
+    const pdfUrl = result.Item.pdfUrl || '';
+    const emailBody = pdfUrl 
+      ? `${finalMessage}\n\nYou can view and download your invoice here:\n${pdfUrl}`
+      : finalMessage;
 
-    const s3Object = await s3Client.send(getObjectCommand);
-    const pdfBuffer = await s3Object.Body?.transformToByteArray();
-
-    if (!pdfBuffer) {
-      return errorResponse(500, 'Failed to retrieve PDF');
-    }
-
-    // Send email with SES
+    // Send email with SES (simple text email with PDF link)
     const emailParams = {
       Source: process.env.SES_FROM_EMAIL!,
       Destination: {
@@ -133,7 +123,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         },
         Body: {
           Text: {
-            Data: finalMessage,
+            Data: emailBody,
           },
         },
       },
@@ -146,7 +136,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const now = new Date().toISOString();
     const updateCommand = new UpdateCommand({
       TableName: process.env.INVOICES_TABLE,
-      Key: { userId, id: invoiceId },
+      Key: { id: invoiceId },
       UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
       ExpressionAttributeNames: {
         '#status': 'status',

@@ -3,6 +3,8 @@ import { ArrowLeft, Download, Mail, Edit2, FileText } from 'lucide-react';
 import { Card, CardContent } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
+import { Modal } from '../ui/Modal';
+import { Input } from '../ui/Input';
 import { Invoice } from '@/types/invoice';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -16,6 +18,11 @@ export function InvoiceDetailPage({ invoice }: InvoiceDetailPageProps) {
   const router = useRouter();
   const [isDownloading, setIsDownloading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailData, setEmailData] = useState({
+    recipientEmail: invoice.client.email || '',
+    message: '',
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -53,20 +60,43 @@ export function InvoiceDetailPage({ invoice }: InvoiceDetailPageProps) {
   };
 
   const handleSend = async () => {
+    setShowEmailModal(true);
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailData.recipientEmail) {
+      toast.error('Please enter a recipient email address');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailData.recipientEmail)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
     try {
       setIsSending(true);
-      const email = prompt('Enter recipient email address:');
-      if (!email) return;
-      
-      const message = prompt('Enter message (optional):');
-      await invoiceService.emailInvoice(invoice.id, email, message || undefined);
+      await invoiceService.emailInvoice(
+        invoice.id,
+        emailData.recipientEmail,
+        emailData.message || undefined
+      );
       toast.success('Invoice sent successfully');
+      setShowEmailModal(false);
+      setEmailData({ recipientEmail: invoice.client.email || '', message: '' });
     } catch (error: any) {
       console.error('Failed to send invoice:', error);
       toast.error(error.response?.data?.message || 'Failed to send invoice');
     } finally {
       setIsSending(false);
     }
+  };
+
+  const handleCloseEmailModal = () => {
+    setShowEmailModal(false);
+    setEmailData({ recipientEmail: invoice.client.email || '', message: '' });
   };
 
   const handleBack = () => {
@@ -243,6 +273,53 @@ export function InvoiceDetailPage({ invoice }: InvoiceDetailPageProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Email Modal */}
+      <Modal
+        isOpen={showEmailModal}
+        onClose={handleCloseEmailModal}
+        title="Send Invoice via Email"
+        footer={
+          <div className="flex gap-3 justify-end">
+            <Button variant="ghost" onClick={handleCloseEmailModal} disabled={isSending}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendEmail} disabled={isSending}>
+              {isSending ? 'Sending...' : 'Send Email'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label="Recipient Email"
+            type="email"
+            placeholder="customer@example.com"
+            value={emailData.recipientEmail}
+            onChange={(e) =>
+              setEmailData({ ...emailData, recipientEmail: e.target.value })
+            }
+            required
+          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Message (Optional)
+            </label>
+            <textarea
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+              rows={4}
+              placeholder="Enter a custom message for the email..."
+              value={emailData.message}
+              onChange={(e) =>
+                setEmailData({ ...emailData, message: e.target.value })
+              }
+            />
+          </div>
+          <p className="text-sm text-gray-500">
+            The invoice PDF will be attached to the email automatically.
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }
