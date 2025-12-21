@@ -19,13 +19,36 @@ A serverless invoice management application built with AWS services and Next.js.
 invoice-generator-saas/
 ├── backend/                 # Serverless backend
 │   ├── functions/          # Lambda function handlers
+│   │   ├── auth/
+│   │   ├── clients/
+│   │   ├── email/
+│   │   ├── invoices/
+│   │   ├── pdf/
+│   │   └── settings/
 │   ├── libs/               # Shared libraries
 │   ├── models/             # TypeScript types/interfaces
 │   └── serverless.yml      # Serverless Framework config
 ├── frontend/               # Next.js application
-│   └── src/               # Source code
-└── infrastructure/         # Shared configuration
+│   ├── src/
+│   │   ├── app/           # App router pages
+│   │   ├── components/    # React components
+│   │   ├── services/      # API services
+│   │   └── store/         # State management
+│   └── package.json
+├── docs/                   # Project documentation
+└── package.json            # Root configuration
 ```
+
+## Documentation
+
+Detailed documentation is available in the `docs/` directory:
+
+- [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md) - Overview of the implemented features and architecture.
+- [Setup Guide](docs/SETUP.md) - Detailed instructions for setting up the development environment.
+- [API Reference](docs/API_REFERENCE.md) - Documentation for the backend API endpoints.
+- [Deployment Guide](docs/DEPLOYMENT.md) - Instructions for deploying the application to AWS.
+- [Design Decisions](docs/DESIGN_DECISIONS.md) - Explanation of architectural choices and trade-offs.
+- [Integration Checklist](docs/INTEGRATION_CHECKLIST.md) - Checklist for ensuring all components work together.
 
 ## Prerequisites
 
@@ -39,7 +62,13 @@ invoice-generator-saas/
 ### 1. Install Dependencies
 
 ```bash
-npm run install:all
+# Backend
+cd backend
+npm install
+
+# Frontend
+cd ../frontend
+npm install
 ```
 
 ### 2. Configure Environment Variables
@@ -57,13 +86,15 @@ cp frontend/.env.example frontend/.env.local
 ### 3. Deploy Backend
 
 ```bash
-npm run deploy:backend
+cd backend
+npm run deploy
 ```
 
 ### 4. Run Frontend Locally
 
 ```bash
-npm run dev:frontend
+cd frontend
+npm run dev
 ```
 
 ## Development
@@ -71,13 +102,15 @@ npm run dev:frontend
 ### Backend Development
 
 ```bash
-npm run dev:backend
+cd backend
+npm run dev
 ```
 
 ### Frontend Development
 
 ```bash
-npm run dev:frontend
+cd frontend
+npm run dev
 ```
 
 ## Deployment
@@ -101,9 +134,11 @@ npm run build
 
 - ✅ User authentication with AWS Cognito
 - ✅ Create and manage invoices
+- ✅ Client management
 - ✅ Generate PDF invoices
 - ✅ Email invoices to clients
 - ✅ Invoice history dashboard
+- ✅ Settings and profile management
 - ✅ Responsive design
 
 ## License
