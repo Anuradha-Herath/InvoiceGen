@@ -1,0 +1,208 @@
+name: Deploy to Development
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18.x'
+  AWS_REGION: 'us-east-1'
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Test Backend
+        working-directory: ./backend
+        run: |
+          npm ci
+          npm run build
+          npm test
+
+      - name: Test Frontend
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run type-check
+          npm run lint
+
+  deploy-backend:
+    name: Deploy Backend to AWS (Dev)
+    runs-on: ubuntu-latest
+    needs: test
+    environment: development
+    outputs:
+      api-url: ${{ steps.deploy.outputs.api-url }}
+      user-pool-id: ${{ steps.deploy.outputs.user-pool-id }}
+      user-pool-client-id: ${{ steps.deploy.outputs.user-pool-client-id }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Serverless Framework
+        run: npm install -g serverless@3
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Build backend
+        working-directory: ./backend
+        run: npm run build
+
+      - name: Deploy to AWS
+        id: deploy
+        working-directory: ./backend
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+          SES_FROM_EMAIL: ${{ secrets.SES_FROM_EMAIL }}
+          STAGE: dev
+        run: |
+          serverless deploy --stage dev --region ${{ env.AWS_REGION }} --verbose
+          
+          # Extract outputs from CloudFormation stack
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name invoice-generator-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='ServiceEndpoint'].OutputValue" \
+            --output text)
+          
+          USER_POOL_ID=$(aws cloudformation describe-stacks \
+            --stack-name invoice-generator-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolId'].OutputValue" \
+            --output text)
+          
+          USER_POOL_CLIENT_ID=$(aws cloudformation describe-stacks \
+            --stack-name invoice-generator-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='UserPoolClientId'].OutputValue" \
+            --output text)
+          
+          echo "api-url=$API_URL" >> $GITHUB_OUTPUT
+          echo "user-pool-id=$USER_POOL_ID" >> $GITHUB_OUTPUT
+          echo "user-pool-client-id=$USER_POOL_CLIENT_ID" >> $GITHUB_OUTPUT
+          
+          echo "### Backend Deployment Complete 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **API URL:** $API_URL" >> $GITHUB_STEP_SUMMARY
+          echo "- **User Pool ID:** $USER_POOL_ID" >> $GITHUB_STEP_SUMMARY
+          echo "- **Stage:** dev" >> $GITHUB_STEP_SUMMARY
+
+  deploy-frontend:
+    name: Deploy Frontend to Vercel (Dev)
+    runs-on: ubuntu-latest
+    needs: deploy-backend
+    environment: development
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Create .env file with backend outputs
+        working-directory: ./frontend
+        env:
+          API_URL: ${{ needs.deploy-backend.outputs.api-url }}
+          USER_POOL_ID: ${{ needs.deploy-backend.outputs.user-pool-id }}
+          USER_POOL_CLIENT_ID: ${{ needs.deploy-backend.outputs.user-pool-client-id }}
+        run: |
+          cat > .env.production << EOF
+          NEXT_PUBLIC_API_URL=$API_URL
+          NEXT_PUBLIC_USER_POOL_ID=$USER_POOL_ID
+          NEXT_PUBLIC_USER_POOL_CLIENT_ID=$USER_POOL_CLIENT_ID
+          NEXT_PUBLIC_AWS_REGION=${{ env.AWS_REGION }}
+          EOF
+          
+          echo "Environment variables configured:"
+          cat .env.production
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Deploy to Vercel (Preview)
+        working-directory: ./frontend
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          DEPLOYMENT_URL=$(vercel deploy \
+            --token=$VERCEL_TOKEN \
+            --yes \
+            --env NEXT_PUBLIC_API_URL=${{ needs.deploy-backend.outputs.api-url }} \
+            --env NEXT_PUBLIC_USER_POOL_ID=${{ needs.deploy-backend.outputs.user-pool-id }} \
+            --env NEXT_PUBLIC_USER_POOL_CLIENT_ID=${{ needs.deploy-backend.outputs.user-pool-client-id }} \
+            --env NEXT_PUBLIC_AWS_REGION=${{ env.AWS_REGION }})
+          
+          echo "### Frontend Deployment Complete 🎨" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment URL:** $DEPLOYMENT_URL" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** Development (Preview)" >> $GITHUB_STEP_SUMMARY
+          
+          echo "DEPLOYMENT_URL=$DEPLOYMENT_URL" >> $GITHUB_ENV
+
+  notify:
+    name: Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    if: always()
+    
+    steps:
+      - name: Check deployment status
+        run: |
+          if [ "${{ needs.deploy-backend.result }}" == "success" ] && [ "${{ needs.deploy-frontend.result }}" == "success" ]; then
+            echo "### ✅ Development Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**API URL:** ${{ needs.deploy-backend.outputs.api-url }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Development Deployment Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Backend Status:** ${{ needs.deploy-backend.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "**Frontend Status:** ${{ needs.deploy-frontend.result }}" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
